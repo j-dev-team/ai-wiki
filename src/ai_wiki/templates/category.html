@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ category }} - {{ wiki_name }}{% endblock %}
+{% block content %}
+<div class="category-page">
+  <h1>{{ category }}</h1>
+  <p class="result-count">{{ t('category.count', count=articles|length) }}</p>
+
+  {% if articles %}
+  <ul class="article-list">
+    {% for a in articles %}
+    <li>
+      <a href="/article/{{ a.id }}">{{ a.title }}</a>
+      <div class="article-meta">
+        <span class="badge badge-cat">{{ a.category }}</span>
+        {% for tag in a.tags[:5] %}
+        <span class="badge badge-tag">{{ tag }}</span>
+        {% endfor %}
+        <span class="confidence">{{ "%.0f"|format(a.confidence * 100) }}%</span>
+        <span class="date">{{ a.last_modified[:10] }}</span>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">{{ t('category.empty') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

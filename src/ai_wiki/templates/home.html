@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ wiki_name }} - {{ t('home.title') }}{% endblock %}
+{% block content %}
+<div class="home">
+  <div class="stats-bar">
+    <div class="stat">
+      <span class="stat-num">{{ total }}</span>
+      <span class="stat-label">{{ t('common.articles') }}</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num">{{ categories|length }}</span>
+      <span class="stat-label">{{ t('common.categories') }}</span>
+    </div>
+  </div>
+
+  <div class="home-grid">
+    <section class="home-section">
+      <h2>{{ t('home.recent') }}</h2>
+      {% if recent %}
+      <ul class="article-list">
+        {% for a in recent %}
+        <li>
+          <a href="/article/{{ a.id }}">{{ a.title }}</a>
+          <div class="article-meta">
+            <span class="badge badge-cat">{{ a.category }}</span>
+            <span class="date">{{ a.last_modified[:10] }}</span>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="empty">{{ t('home.empty_articles') }}</p>
+      {% endif %}
+    </section>
+
+    <section class="home-section">
+      <h2>{{ t('home.categories') }}</h2>
+      {% if categories %}
+      <ul class="cat-list">
+        {% for cat, count in categories.items() %}
+        <li>
+          <a href="/category/{{ cat }}">{{ cat }}</a>
+          <span class="cat-count">{{ count }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="empty">{{ t('home.empty_categories') }}</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

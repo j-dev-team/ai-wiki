@@ -1,0 +1,29 @@
+# Python
+.venv/
+.release-venv/
+.verify-venv/
+.pypi-verify/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.eggs/
+release-dist/
+
+# Wiki instance data (not part of the program)
+articles/
+data/
+sources/
+logs/
+tmp/
+.ai-wiki.yaml
+
+# OS
+.DS_Store
+Thumbs.db
+nul
+
+# IDE
+.vscode/
+.idea/

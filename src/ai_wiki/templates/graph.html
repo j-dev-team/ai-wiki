@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}{{ t('graph.title') }} - {{ wiki_name }}{% endblock %}
+{% block content %}
+<div class="graph-page">
+  <h1>{{ t('graph.title') }}</h1>
+  <p class="result-count">{{ t('graph.summary', nodes=nodes|length, edges=edges|length) }}</p>
+
+  <div class="graph-toolbar">
+    <div class="graph-search-wrap">
+      <input type="text" id="graphSearch" placeholder="{{ t('graph.search_placeholder') }}" class="graph-search-input">
+      <button id="graphSearchBtn" class="btn-graph-search">{{ t('common.search') }}</button>
+      <button id="graphSearchClear" class="btn-graph-clear">{{ t('common.clear') }}</button>
+    </div>
+    <div class="graph-filter-wrap">
+      <label class="filter-label">{{ t('graph.category') }}</label>
+      <div id="catFilters" class="cat-filter-group"></div>
+    </div>
+    <div class="graph-filter-wrap">
+      <label class="filter-label">{{ t('graph.maturity') }}</label>
+      <select id="maturityFilter" class="filter-select">
+        <option value="">{{ t('common.all') }}</option>
+        <option value="mature">mature</option>
+        <option value="review">review</option>
+        <option value="draft">draft</option>
+        <option value="stub">stub</option>
+      </select>
+    </div>
+    <div class="graph-filter-wrap">
+      <label class="filter-label">{{ t('graph.confidence_min') }}</label>
+      <input type="range" id="confFilter" min="0" max="100" value="0" class="conf-slider">
+      <span id="confValue">0%</span>
+    </div>
+  </div>
+
+  <div id="graph-container">
+    <div class="graph-legend" id="graphLegend"></div>
+    <div class="graph-controls">{{ t('graph.controls') }}</div>
+  </div>
+</div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+const allNodes = {{ nodes | tojson }};
+const allEdges = {{ edges | tojson }};
+
+const catColors = {
+  history: '#f85149', technology: '#58a6ff', misc: '#8b949e',
+  test: '#d29922', politics: '#bc8cff', science: '#3fb950',
+  military: '#f0883e', law: '#d29922', economics: '#a5d6ff',
+  project: '#7ee787', philosophy: '#d2a8ff', geography: '#56d364',
+  society: '#db61a2',
+};
+function getCatColor(cat) { return catColors[cat] || '#8b949e'; }
+
+const maturityRadius = { stub: 6, draft: 9, review: 12, mature: 16, unknown: 8, authoritative: 18 };
+const allCats = [...new Set(allNodes.map(n => n.category))].sort();
+const catFiltersDiv = document.getElementById('catFilters');
+const catChecks = {};
+
+allCats.forEach(cat => {
+  const label = document.createElement('label');
+  label.className = 'cat-check-label';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = true;
+  cb.value = cat;
+  cb.className = 'cat-checkbox';
+  const dot = document.createElement('span');
+  dot.className = 'cat-dot';
+  dot.style.background = getCatColor(cat);
+  label.appendChild(cb);
+  label.appendChild(dot);
+  label.appendChild(document.createTextNode(cat));
+  catFiltersDiv.appendChild(label);
+  catChecks[cat] = cb;
+  cb.addEventListener('change', applyFilters);
+});
+
+const legendDiv = document.getElementById('graphLegend');
+allCats.forEach(cat => {
+  const div = document.createElement('div');
+  div.innerHTML = `<span style="background:${getCatColor(cat)}"></span>${cat}`;
+  legendDiv.appendChild(div);
+});
+
+let currentSearch = '';
+let currentMaturity = '';
+let currentMinConf = 0;
+
+document.getElementById('maturityFilter').addEventListener('change', e => {
+  currentMaturity = e.target.value;
+  applyFilters();
+});
+document.getElementById('confFilter').addEventListener('input', e => {
+  currentMinConf = parseInt(e.target.value, 10) / 100;
+  document.getElementById('confValue').textContent = e.target.value + '%';
+  applyFilters();
+});
+
+function applyFilters() {
+  const activeCats = new Set(allCats.filter(c => catChecks[c] && catChecks[c].checked));
+  const visibleNodes = allNodes.filter(n => {
+    if (!activeCats.has(n.category)) return false;
+    if (currentMaturity && n.maturity !== currentMaturity) return false;
+    if (n.confidence < currentMinConf) return false;
+    return true;
+  });
+  const visibleIds = new Set(visibleNodes.map(n => n.id));
+  const visibleEdges = allEdges.filter(e => visibleIds.has(e.source) && visibleIds.has(e.target));
+  updateGraph(visibleNodes, visibleEdges);
+}
+
+function highlightSearch(query) {
+  currentSearch = query.toLowerCase().trim();
+  if (!currentSearch) {
+    nodeSelection.attr('opacity', 1);
+    linkSelection.attr('stroke-opacity', 0.4);
+    return;
+  }
+  const matchIds = new Set(allNodes.filter(n => n.title.toLowerCase().includes(currentSearch) || n.id.toLowerCase().includes(currentSearch)).map(n => n.id));
+  nodeSelection.attr('opacity', d => matchIds.has(d.id) ? 1 : 0.15);
+  linkSelection.attr('stroke-opacity', l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    return (matchIds.has(sid) || matchIds.has(tid)) ? 0.7 : 0.1;
+  });
+  if (matchIds.size > 0) {
+    const firstMatch = simulation.nodes().find(n => matchIds.has(n.id));
+    if (firstMatch) {
+      const target = d3.zoomIdentity.translate(width / 2 - firstMatch.x, height / 2 - firstMatch.y).scale(1.5);
+      svg.transition().duration(750).call(zoom.transform, target);
+    }
+  }
+}
+
+document.getElementById('graphSearchBtn').addEventListener('click', () => {
+  highlightSearch(document.getElementById('graphSearch').value);
+});
+document.getElementById('graphSearch').addEventListener('keydown', e => {
+  if (e.key === 'Enter') highlightSearch(e.target.value);
+});
+document.getElementById('graphSearchClear').addEventListener('click', () => {
+  document.getElementById('graphSearch').value = '';
+  currentSearch = '';
+  nodeSelection && nodeSelection.attr('opacity', 1);
+  linkSelection && linkSelection.attr('stroke-opacity', 0.4);
+});
+
+const container = document.getElementById('graph-container');
+const width = container.clientWidth || 1100;
+const height = Math.max(700, window.innerHeight - 250);
+
+const svg = d3.select('#graph-container').append('svg')
+  .attr('width', width).attr('height', height);
+
+const g = svg.append('g');
+const zoom = d3.zoom().scaleExtent([0.2, 5]).on('zoom', (event) => g.attr('transform', event.transform));
+svg.call(zoom);
+
+svg.append('defs').append('marker')
+  .attr('id', 'arrow').attr('viewBox', '0 0 10 10')
+  .attr('refX', 20).attr('refY', 5)
+  .attr('markerWidth', 6).attr('markerHeight', 6)
+  .attr('orient', 'auto')
+  .append('path').attr('d', 'M0,0 L10,5 L0,10 Z').attr('fill', '#30363d');
+
+let simulation, linkSelection, nodeSelection;
+
+function updateGraph(nodes, edges) {
+  g.selectAll('*').remove();
+  if (simulation) simulation.stop();
+
+  simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(edges).id(d => d.id).distance(150))
+    .force('charge', d3.forceManyBody().strength(-400))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force('collision', d3.forceCollide().radius(d => (maturityRadius[d.maturity] || 8) + 6))
+    .force('x', d3.forceX(width / 2).strength(0.03))
+    .force('y', d3.forceY(height / 2).strength(0.03));
+
+  linkSelection = g.append('g')
+    .selectAll('line').data(edges).join('line')
+    .attr('stroke', '#30363d').attr('stroke-width', 1.5).attr('stroke-opacity', 0.4)
+    .attr('marker-end', 'url(#arrow)');
+
+  const nodeG = g.append('g').selectAll('g').data(nodes).join('g')
+    .call(d3.drag()
+      .on('start', (event, d) => { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+      .on('end', (event, d) => { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+    );
+
+  nodeG.append('circle')
+    .attr('r', d => maturityRadius[d.maturity] || 8)
+    .attr('fill', d => getCatColor(d.category))
+    .attr('stroke', '#e6edf3').attr('stroke-width', 1.5)
+    .style('cursor', 'pointer')
+    .on('click', (event, d) => { window.location.href = '/article/' + d.id; })
+    .on('mouseover', function(event, d) {
+      d3.select(this).attr('stroke', '#f0f6fc').attr('stroke-width', 3);
+      linkSelection.attr('stroke-opacity', l => {
+        const sid = typeof l.source === 'object' ? l.source.id : l.source;
+        const tid = typeof l.target === 'object' ? l.target.id : l.target;
+        return (sid === d.id || tid === d.id) ? 0.9 : 0.1;
+      });
+      nodeSelection.attr('opacity', n => {
+        if (n.id === d.id) return 1;
+        const connected = edges.some(l => {
+          const sid = typeof l.source === 'object' ? l.source.id : l.source;
+          const tid = typeof l.target === 'object' ? l.target.id : l.target;
+          return (sid === d.id && tid === n.id) || (tid === d.id && sid === n.id);
+        });
+        return connected ? 1 : 0.2;
+      });
+    })
+    .on('mouseout', function() {
+      d3.select(this).attr('stroke', '#e6edf3').attr('stroke-width', 1.5);
+      linkSelection.attr('stroke-opacity', 0.4);
+      nodeSelection.attr('opacity', 1);
+      if (currentSearch) highlightSearch(currentSearch);
+    });
+
+  nodeG.append('text')
+    .text(d => d.title.length > 22 ? d.title.slice(0, 22) + '...' : d.title)
+    .attr('x', d => (maturityRadius[d.maturity] || 8) + 5)
+    .attr('y', 4)
+    .attr('fill', '#e6edf3').attr('font-size', '11px')
+    .style('pointer-events', 'none');
+
+  nodeG.append('title').text(d => `${d.title}
+${d.category}
+${d.maturity} | conf ${Math.round(d.confidence * 100)}%`);
+
+  nodeSelection = nodeG;
+
+  simulation.on('tick', () => {
+    linkSelection.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+}
+
+updateGraph(JSON.parse(JSON.stringify(allNodes)), JSON.parse(JSON.stringify(allEdges)));
+</script>
+{% endblock %}

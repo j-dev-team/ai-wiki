@@ -1,0 +1,14 @@
+package_name: research-wiki
+display_name: 리서치위키
+domain: research
+description: Research wiki for source-backed investigations, literature notes, reports, claims, evidence, and reusable research briefs.
+summary: Source-backed research, literature notes, reports, and evidence.
+triggers:
+  - 리서치
+  - 조사
+  - 보고서
+  - 출처
+  - 논문
+  - evidence
+  - research
+  - literature

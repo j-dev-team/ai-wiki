@@ -1,0 +1,14 @@
+package_name: personal-wiki
+display_name: 개인위키
+domain: personal
+description: Personal memory wiki for private notes, decisions, preferences, personal projects, reflections, and long-term context.
+summary: Personal notes, decisions, preferences, projects, and long-term memory.
+triggers:
+  - 개인메모
+  - 결정
+  - 선호
+  - 개인프로젝트
+  - 회고
+  - personal
+  - memory
+  - decision

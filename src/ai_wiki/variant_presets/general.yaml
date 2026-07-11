@@ -1,0 +1,11 @@
+package_name: general-wiki
+display_name: General Wiki
+domain: general
+description: General-purpose reusable knowledge wiki for factual notes, explanations, research, and cross-domain reference material.
+summary: General reusable knowledge and notes.
+triggers:
+  - general knowledge
+  - reusable notes
+  - explanation
+  - research
+  - reference

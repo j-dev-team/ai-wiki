@@ -1,0 +1,14 @@
+package_name: tech-wiki
+display_name: 기술위키
+domain: technology
+description: Technology wiki for programming, frameworks, system design, troubleshooting, architecture decisions, and reusable engineering knowledge.
+summary: Programming, frameworks, system design, troubleshooting, and engineering notes.
+triggers:
+  - 개발
+  - 기술
+  - 오류해결
+  - 프레임워크
+  - 시스템설계
+  - programming
+  - troubleshooting
+  - architecture

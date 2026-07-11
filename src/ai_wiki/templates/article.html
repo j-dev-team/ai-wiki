@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% block title %}{{ article.title }} - {{ wiki_name }}{% endblock %}
+{% block content %}
+
+{% macro render_value(value, depth=0) %}
+  {% if value is mapping %}
+    <div class="nested-dict" style="margin-left: {{ depth * 16 }}px">
+      {% for k, v in value.items() %}
+      <div class="kv-pair">
+        <span class="kv-key">{{ k }}:</span>
+        <span class="kv-value">{{ render_value(v, depth + 1) }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  {% elif value is iterable and value is not string %}
+    <ul class="value-list">
+      {% for item in value %}
+      <li>
+        {% if item is mapping %}
+          {{ render_value(item, depth + 1) }}
+        {% else %}
+          {{ item }}
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <span class="scalar-value">{{ value }}</span>
+  {% endif %}
+{% endmacro %}
+
+<div class="article-layout">
+  <article class="article-view">
+    <header class="article-header">
+      <h1>{{ article.title }}</h1>
+      <div class="article-meta-bar">
+        <span class="badge badge-cat">{{ article.category }}</span>
+        {% if article.content.type %}
+        <span class="badge badge-type">{{ article.content.type }}</span>
+        {% endif %}
+        {% if quality %}
+        <span class="badge badge-maturity badge-maturity-{{ quality.maturity }}">{{ quality.maturity }}</span>
+        {% endif %}
+        {% for tag in article.tags %}
+        <a href="/tag/{{ tag }}" class="badge badge-tag" style="text-decoration:none">{{ tag }}</a>
+        {% endfor %}
+      </div>
+    </header>
+
+    <div class="quality-bar">
+      <div class="quality-item">
+        <span class="quality-label">{{ t('common.confidence') }}</span>
+        <div class="progress-bar">
+          <div class="progress-fill progress-confidence" style="width: {{ (article.confidence * 100)|int }}%"></div>
+          <span class="progress-text">{{ "%.0f"|format(article.confidence * 100) }}%</span>
+        </div>
+      </div>
+      {% if quality %}
+      <div class="quality-item">
+        <span class="quality-label">{{ t('common.quality') }}</span>
+        <div class="progress-bar">
+          <div class="progress-fill progress-quality" style="width: {{ (quality.quality_score * 100)|int }}%"></div>
+          <span class="progress-text">{{ "%.0f"|format(quality.quality_score * 100) }}%</span>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="article-info">
+      <div class="info-grid">
+        <div><strong>ID:</strong> <code>{{ article.id }}</code></div>
+        <div><strong>{{ t('article.version') }}:</strong> {{ article.version }}</div>
+        <div><strong>{{ t('common.author') }}:</strong> {{ article.author }}</div>
+        <div><strong>{{ t('common.created') }}:</strong> {{ article.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+        <div><strong>{{ t('common.modified') }}:</strong> {{ article.last_modified.strftime('%Y-%m-%d %H:%M') }}</div>
+        <div><strong>{{ t('common.verified') }}:</strong> {{ article.last_verified.strftime('%Y-%m-%d %H:%M') }}</div>
+      </div>
+
+      {% if article.sources %}
+      <div class="sources">
+        <strong>{{ t('common.sources') }}:</strong>
+        <ul>
+          {% for src in article.sources %}
+          <li><a href="{{ src }}" target="_blank" rel="noopener">{{ src|truncate(80) }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% if article.related %}
+      <div class="related">
+        <strong>{{ t('common.related') }} ({{ article.related|length }}):</strong>
+        <div class="related-links">
+          {% for rel in article.related %}
+          <a href="/article/{{ rel }}" class="related-link" title="{{ rel }}">{{ related_map.get(rel, rel) }}</a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="article-content structured">
+      {% for key, value in article.content.items() %}
+        {% if not key.startswith('_') %}
+          {% if key == 'disputes' and value is iterable and value is not string %}
+          <div class="content-section">
+            <h3 class="section-key">{{ key }}</h3>
+            {% for dispute in value %}
+              {% if dispute is mapping %}
+              <div class="dispute-card">
+                <div class="dispute-topic">{{ dispute.get('topic', '') }}</div>
+                {% if dispute.get('status') %}
+                <span class="badge badge-dispute-{{ dispute.status }}">{{ dispute.status }}</span>
+                {% endif %}
+                {% if dispute.get('consensus_shift') %}
+                <p class="dispute-shift">{{ dispute.consensus_shift }}</p>
+                {% endif %}
+                {% if dispute.get('positions') is iterable %}
+                <div class="dispute-positions">
+                  {% for pos in dispute.positions %}
+                    {% if pos is mapping %}
+                    <div class="position-card">
+                      <div class="position-claim">{{ pos.get('claim', '') }}</div>
+                      {% if pos.get('supporters') %}<div class="position-who">{{ pos.supporters }}</div>{% endif %}
+                      {% if pos.get('evidence_quality') %}<span class="badge badge-evidence">{{ pos.evidence_quality }}</span>{% endif %}
+                      {% if pos.get('note') %}<p class="position-note">{{ pos.note }}</p>{% endif %}
+                    </div>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+                {% endif %}
+              </div>
+              {% else %}
+              <div>{{ render_value(dispute) }}</div>
+              {% endif %}
+            {% endfor %}
+          </div>
+          {% elif key == 'historiography' and value is iterable and value is not string %}
+          <div class="content-section">
+            <h3 class="section-key">{{ key }}</h3>
+            <div class="timeline-track">
+              {% for entry in value %}
+                {% if entry is mapping %}
+                <div class="timeline-entry">
+                  <div class="timeline-dot"></div>
+                  <div class="timeline-content">
+                    <span class="timeline-period">{{ entry.get('period', '') }}</span>
+                    <p class="timeline-interp">{{ entry.get('interpretation', entry.get('consensus', '')) }}</p>
+                    {% if entry.get('context') %}<p class="timeline-ctx">{{ entry.context }}</p>{% endif %}
+                    {% if entry.get('source_type') %}<span class="badge badge-tag">{{ entry.source_type }}</span>{% endif %}
+                    {% if entry.get('note') %}<p class="timeline-note">{{ entry.note }}</p>{% endif %}
+                  </div>
+                </div>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+          {% else %}
+          <div class="content-section">
+            <h3 class="section-key">{{ key }}</h3>
+            <div class="section-value">{{ render_value(value) }}</div>
+          </div>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    {% if article.content._meta is defined and article.content._meta %}
+    <details class="meta-panel">
+      <summary>{{ t('article.document_meta') }}</summary>
+      <pre><code>{{ article.content._meta | yaml_dump }}</code></pre>
+    </details>
+    {% endif %}
+
+    {% if article.content._changelog is defined and article.content._changelog %}
+    <details class="meta-panel">
+      <summary>{{ t('article.changelog', count=article.content._changelog|length) }}</summary>
+      <div class="changelog-list">
+        {% for entry in article.content._changelog|reverse %}
+        <div class="changelog-entry">
+          <span class="changelog-date">{{ entry.date }}</span>
+          <span class="badge badge-action">{{ entry.action }}</span>
+          {% if entry.fields %}<span class="changelog-fields">{{ entry.fields|join(', ') }}</span>{% endif %}
+          {% if entry.details %}<p class="changelog-details">{{ entry.details }}</p>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+
+    <details class="raw-yaml">
+      <summary>{{ t('article.raw_yaml') }}</summary>
+      <pre><code>{{ article.content | yaml_dump }}</code></pre>
+    </details>
+
+    <div class="article-actions">
+      <a href="/edit/{{ article.id }}" class="btn btn-edit">{{ t('common.edit') }}</a>
+      <a href="/graph/{{ article.id }}" class="btn btn-secondary">{{ t('article.local_graph') }}</a>
+      <form action="/delete/{{ article.id }}" method="post" class="inline-form" onsubmit="return confirm('{{ t('article.confirm_delete') }}')">
+        <button type="submit" class="btn btn-delete">{{ t('common.delete') }}</button>
+      </form>
+    </div>
+  </article>
+
+  <aside class="article-sidebar">
+    <div class="sidebar-section">
+      <h3 class="sidebar-title">{{ t('article.sidebar_related') }}</h3>
+      {% if article.related %}
+      <div class="sidebar-links">
+        <div class="sidebar-subtitle">{{ t('article.outgoing') }}</div>
+        {% for rel in article.related %}
+        <a href="/article/{{ rel }}" class="sidebar-link">{{ related_map.get(rel, rel) }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if backlinks %}
+      <div class="sidebar-links" style="margin-top:0.75rem">
+        <div class="sidebar-subtitle">{{ t('article.incoming') }}</div>
+        {% for bl in backlinks[:8] %}
+        <a href="/article/{{ bl.id }}" class="sidebar-link">{{ bl.title }}</a>
+        {% endfor %}
+        {% if backlinks|length > 8 %}
+        <span class="sidebar-more">{{ t('article.more', count=backlinks|length - 8) }}</span>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% if not article.related and not backlinks %}
+      <p class="sidebar-empty">{{ t('article.no_links') }}</p>
+      {% endif %}
+    </div>
+
+    {% if similar %}
+    <div class="sidebar-section">
+      <h3 class="sidebar-title">{{ t('article.similar') }}</h3>
+      <div class="sidebar-links">
+        {% for s in similar %}
+        <a href="/article/{{ s.id }}" class="sidebar-link">
+          {{ s.title }}
+          <span class="sidebar-meta">{{ s.get('category', '') }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="sidebar-section">
+      <a href="/graph/{{ article.id }}" class="sidebar-graph-btn">{{ t('article.view_local_graph') }}</a>
+    </div>
+  </aside>
+</div>
+{% endblock %}

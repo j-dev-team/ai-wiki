@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ t('all.title') }} - {{ wiki_name }}{% endblock %}
+{% block content %}
+<div class="all-page">
+  <h1>{{ t('all.title') }} ({{ articles|length }})</h1>
+
+  <div class="sort-bar">
+    {{ t('all.sort') }}:
+    <a href="?sort=modified" class="{% if sort == 'modified' %}active{% endif %}">{{ t('all.sort_modified') }}</a>
+    <a href="?sort=title" class="{% if sort == 'title' %}active{% endif %}">{{ t('all.sort_title') }}</a>
+    <a href="?sort=category" class="{% if sort == 'category' %}active{% endif %}">{{ t('all.sort_category') }}</a>
+    <a href="?sort=confidence" class="{% if sort == 'confidence' %}active{% endif %}">{{ t('all.sort_confidence') }}</a>
+  </div>
+
+  {% if articles %}
+  <ul class="article-list">
+    {% for a in articles %}
+    <li>
+      <a href="/article/{{ a.id }}">{{ a.title }}</a>
+      <div class="article-meta">
+        <span class="badge badge-cat">{{ a.category }}</span>
+        {% for tag in a.tags[:3] %}
+        <span class="badge badge-tag">{{ tag }}</span>
+        {% endfor %}
+        <span class="confidence">{{ "%.0f"|format(a.confidence * 100) }}%</span>
+        <span class="date">{{ a.last_modified[:10] }}</span>
+        <span class="author">{{ t('all.by_author', author=a.author) }}</span>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">{{ t('all.empty') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

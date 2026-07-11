@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}{{ t('dashboard.title') }} - {{ wiki_name }}{% endblock %}
+{% block content %}
+<div class="dashboard">
+  <h1>{{ t('dashboard.title') }}</h1>
+
+  <div class="dash-stats">
+    <div class="dash-card">
+      <span class="dash-num">{{ total }}</span>
+      <span class="dash-label">{{ t('dashboard.total_articles') }}</span>
+    </div>
+    <div class="dash-card">
+      <span class="dash-num">{{ "%.0f"|format(avg_score * 100) }}%</span>
+      <span class="dash-label">{{ t('dashboard.avg_quality') }}</span>
+    </div>
+    <div class="dash-card">
+      <span class="dash-num dash-green">{{ maturity_dist.get('mature', 0) }}</span>
+      <span class="dash-label">{{ t('dashboard.mature') }}</span>
+    </div>
+    <div class="dash-card">
+      <span class="dash-num dash-blue">{{ maturity_dist.get('review', 0) }}</span>
+      <span class="dash-label">{{ t('dashboard.review') }}</span>
+    </div>
+    <div class="dash-card">
+      <span class="dash-num dash-orange">{{ maturity_dist.get('draft', 0) }}</span>
+      <span class="dash-label">{{ t('dashboard.draft') }}</span>
+    </div>
+    <div class="dash-card">
+      <span class="dash-num dash-red">{{ maturity_dist.get('stub', 0) }}</span>
+      <span class="dash-label">{{ t('dashboard.stub') }}</span>
+    </div>
+  </div>
+
+  <div class="maturity-bar-container">
+    <h2>{{ t('dashboard.maturity_distribution') }}</h2>
+    <div class="maturity-stack-bar">
+      {% set total_count = total or 1 %}
+      {% if maturity_dist.get('mature', 0) > 0 %}
+      <div class="mbar mbar-mature" style="width: {{ (maturity_dist.mature / total_count * 100)|int }}%" title="{{ t('dashboard.mature') }}: {{ maturity_dist.mature }}">{{ maturity_dist.mature }}</div>
+      {% endif %}
+      {% if maturity_dist.get('review', 0) > 0 %}
+      <div class="mbar mbar-review" style="width: {{ (maturity_dist.review / total_count * 100)|int }}%" title="{{ t('dashboard.review') }}: {{ maturity_dist.review }}">{{ maturity_dist.review }}</div>
+      {% endif %}
+      {% if maturity_dist.get('draft', 0) > 0 %}
+      <div class="mbar mbar-draft" style="width: {{ (maturity_dist.draft / total_count * 100)|int }}%" title="{{ t('dashboard.draft') }}: {{ maturity_dist.draft }}">{{ maturity_dist.draft }}</div>
+      {% endif %}
+      {% if maturity_dist.get('stub', 0) > 0 %}
+      <div class="mbar mbar-stub" style="width: {{ (maturity_dist.stub / total_count * 100)|int }}%" title="{{ t('dashboard.stub') }}: {{ maturity_dist.stub }}">{{ maturity_dist.stub }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="dash-two-col">
+    <div class="dash-section">
+      <h2>{{ t('dashboard.by_category') }}</h2>
+      {% if cat_data %}
+      <div class="cat-chart">
+        {% set max_count = cat_data[0].count if cat_data else 1 %}
+        {% for cat in cat_data %}
+        <div class="cat-bar-row">
+          <a href="/category/{{ cat.category }}" class="cat-bar-label" title="{{ cat.category }}">
+            {{ cat.category | truncate(20, True, '...') }}
+          </a>
+          <div class="cat-bar-track">
+            <div class="cat-bar-fill" style="width: {{ (cat.count / max_count * 100)|int }}%"></div>
+          </div>
+          <span class="cat-bar-count">{{ cat.count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-dim">{{ t('dashboard.no_category_data') }}</p>
+      {% endif %}
+    </div>
+
+    <div class="dash-section">
+      <h2>{{ t('dashboard.recent_activity') }}</h2>
+      {% if recent %}
+      <div class="timeline-list">
+        {% for a in recent %}
+        <div class="timeline-item">
+          <div class="timeline-dot-sm"></div>
+          <div class="timeline-body">
+            <a href="/article/{{ a.id }}" class="timeline-title">{{ a.title | truncate(40, True, '...') }}</a>
+            <div class="timeline-meta">
+              <span class="badge badge-cat" style="font-size:0.7rem">{{ a.category.split('/')[0] }}</span>
+              <span class="timeline-date">{{ a.last_modified[:10] if a.last_modified else '' }}</span>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-dim">{{ t('dashboard.no_recent_activity') }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="dash-section">
+    <h2>{{ t('dashboard.tag_cloud') }}</h2>
+    {% if tag_cloud %}
+    <div class="tag-cloud">
+      {% set max_tag_count = tag_cloud[0].count if tag_cloud else 1 %}
+      {% for item in tag_cloud %}
+      {% set size = 0.75 + (item.count / max_tag_count) * 0.9 %}
+      {% set opacity = 0.6 + (item.count / max_tag_count) * 0.4 %}
+      <a href="/tag/{{ item.tag }}" class="tag-cloud-item" style="font-size: {{ size }}rem; opacity: {{ opacity }};" title="{{ t('tag.count', count=item.count) }}">{{ item.tag }}</a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-dim">{{ t('dashboard.no_tags') }}</p>
+    {% endif %}
+  </div>
+
+  {% if access_stats %}
+  <div class="dash-two-col">
+    <div class="dash-section">
+      <h2>{{ t('dashboard.top_articles') }}</h2>
+      {% if access_stats.top_articles %}
+      <table class="dash-table small-table">
+        <thead><tr><th>{{ t('dashboard.article') }}</th><th>{{ t('dashboard.views') }}</th></tr></thead>
+        <tbody>
+          {% for item in access_stats.top_articles %}
+          <tr>
+            <td><a href="/article/{{ item.article_id }}">{{ item.article_id | truncate(30) }}</a></td>
+            <td>{{ item.views }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="text-dim">{{ t('dashboard.no_data') }}</p>
+      {% endif %}
+    </div>
+    <div class="dash-section">
+      <h2>{{ t('dashboard.top_queries') }}</h2>
+      {% if access_stats.top_queries %}
+      <table class="dash-table small-table">
+        <thead><tr><th>{{ t('dashboard.query') }}</th><th>{{ t('dashboard.count') }}</th></tr></thead>
+        <tbody>
+          {% for item in access_stats.top_queries %}
+          <tr>
+            <td>{{ item.query }}</td>
+            <td>{{ item.count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="text-dim">{{ t('dashboard.no_data') }}</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <h2>{{ t('dashboard.quality_table') }}</h2>
+  <table class="dash-table">
+    <thead>
+      <tr>
+        <th>{{ t('common.title') }}</th>
+        <th>{{ t('common.category') }}</th>
+        <th>{{ t('common.maturity') }}</th>
+        <th>{{ t('common.quality') }}</th>
+        <th>{{ t('dashboard.issues') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in reports %}
+      <tr>
+        <td><a href="/article/{{ r.id }}">{{ r.title }}</a></td>
+        <td><span class="badge badge-cat">{{ r.category }}</span></td>
+        <td><span class="badge badge-maturity badge-maturity-{{ r.maturity }}">{{ r.maturity }}</span></td>
+        <td>
+          <div class="mini-bar">
+            <div class="mini-fill" style="width: {{ (r.score * 100)|int }}%; background: {% if r.score >= 0.7 %}var(--green){% elif r.score >= 0.4 %}var(--orange){% else %}var(--red){% endif %}"></div>
+            <span class="mini-text">{{ "%.0f"|format(r.score * 100) }}%</span>
+          </div>
+        </td>
+        <td>
+          {% if r.errors > 0 %}<span class="issue-count issue-error">{{ r.errors }}E</span>{% endif %}
+          {% if r.warnings > 0 %}<span class="issue-count issue-warn">{{ r.warnings }}W</span>{% endif %}
+          {% if r.errors == 0 and r.warnings == 0 %}<span class="issue-ok">OK</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+package_name: business-wiki
+display_name: 업무위키
+domain: business
+description: Business operations wiki for customers, accounts, consultations, sales notes, meeting records, workflows, and operating knowledge.
+summary: Customers, consultations, sales, meetings, and business operations.
+triggers:
+  - 고객
+  - 거래처
+  - 상담
+  - 미팅
+  - 영업
+  - 업무일지
+  - business
+  - customer

@@ -1,0 +1,14 @@
+package_name: tax-wiki
+display_name: 세무위키
+domain: tax
+description: Tax knowledge wiki for VAT, income tax, corporate tax, withholding tax, tax law changes, filings, and tax advisory notes.
+summary: Tax, VAT, income tax, corporate tax, withholding, and filings.
+triggers:
+  - 세무
+  - 부가세
+  - 소득세
+  - 법인세
+  - 원천세
+  - 세법개정
+  - tax
+  - vat

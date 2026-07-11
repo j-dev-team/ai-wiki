@@ -1,0 +1,14 @@
+package_name: labor-wiki
+display_name: 노무위키
+domain: labor
+description: Labor and employment wiki for employment contracts, wages, dismissals, workplace rules, social insurance, and HR compliance notes.
+summary: Labor, employment, wages, dismissals, and HR compliance.
+triggers:
+  - 노무
+  - 근로계약
+  - 임금
+  - 해고
+  - 취업규칙
+  - 4대보험
+  - labor
+  - employment

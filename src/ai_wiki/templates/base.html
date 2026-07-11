@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{{ wiki_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">{{ wiki_name }}</a>
+      <form class="nav-search" action="/search" method="get">
+        <input type="text" name="q" placeholder="{{ t('nav.search_placeholder') }}" value="{{ request.args.get('q', '') }}">
+        <button type="submit">{{ t('nav.search') }}</button>
+      </form>
+      <div class="nav-links">
+        <a href="/all">{{ t('nav.all') }}</a>
+        <a href="/graph">{{ t('nav.graph') }}</a>
+        <a href="/dashboard">{{ t('nav.quality') }}</a>
+        <a href="/create">{{ t('nav.new') }}</a>
+        <a href="/stale">{{ t('nav.stale') }}</a>
+      </div>
+      <form class="lang-selector" action="{{ request.path }}" method="get" title="{{ t('nav.language') }}">
+        {% for key, values in request.args.lists() %}
+          {% if key != 'lang' %}
+            {% for value in values %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endfor %}
+          {% endif %}
+        {% endfor %}
+        <select name="lang" aria-label="{{ t('nav.language') }}" onchange="this.form.submit()">
+          {% for code in supported_langs %}
+          <option value="{{ code }}" {% if code == lang %}selected{% endif %}>{{ lang_labels[code] }}</option>
+          {% endfor %}
+        </select>
+      </form>
+    </div>
+  </nav>
+
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for cat, msg in messages %}
+    <div class="flash flash-{{ cat }}">{{ msg }}</div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <p>{{ wiki_name }} v0.2.1 &mdash; {{ t('footer.text') }}</p>
+  </footer>
+</body>
+</html>

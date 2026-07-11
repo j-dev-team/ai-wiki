@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ t('search.title') }}{% if q %}: {{ q }}{% endif %} - {{ wiki_name }}{% endblock %}
+{% block content %}
+<div class="search-page">
+  <h1>{{ t('search.title') }}{% if q %}: "{{ q }}"{% endif %}</h1>
+
+  {% if q %}
+  <p class="result-count">{{ t('search.results_found', count=results|length) }}</p>
+
+  {% if results %}
+  <ul class="article-list">
+    {% for r in results %}
+    <li>
+      <a href="/article/{{ r.id }}">{{ r.title }}</a>
+      <div class="article-meta">
+        <span class="badge badge-cat">{{ r.category }}</span>
+        {% for tag in r.tags[:5] %}
+        <span class="badge badge-tag">{{ tag }}</span>
+        {% endfor %}
+        <span class="confidence">{{ "%.0f"|format(r.confidence * 100) }}%</span>
+      </div>
+      {% if r.snippet %}
+      <p class="snippet">{{ r.snippet }}</p>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">{{ t('search.no_results') }}</p>
+  {% endif %}
+  {% else %}
+  <p class="empty">{{ t('search.enter_query') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ t('tag.title') }}: {{ tagname }} - {{ wiki_name }}{% endblock %}
+{% block content %}
+<div class="tag-page">
+  <h1>{{ t('tag.title') }}: <span class="badge badge-tag" style="font-size:1.2rem">{{ tagname }}</span></h1>
+  <p class="result-count">{{ t('tag.count', count=articles|length) }}</p>
+
+  <div class="article-list">
+    {% for a in articles %}
+    <div class="article-card">
+      <a href="/article/{{ a.id }}" class="article-card-title">{{ a.title }}</a>
+      <div class="article-card-meta">
+        <span class="badge badge-cat">{{ a.category }}</span>
+        <span class="text-dim" style="font-size:0.78rem">{{ t('common.confidence') }} {{ "%.0f"|format(a.confidence * 100) }}%</span>
+      </div>
+    </div>
+    {% else %}
+    <p class="text-dim">{{ t('tag.empty') }}</p>
+    {% endfor %}
+  </div>
+
+  <p style="margin-top:1rem"><a href="/dashboard">&larr; {{ t('tag.back_dashboard') }}</a></p>
+</div>
+{% endblock %}

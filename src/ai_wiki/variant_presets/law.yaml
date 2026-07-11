@@ -1,0 +1,14 @@
+package_name: law-wiki
+display_name: 법률위키
+domain: law
+description: Legal knowledge wiki for contracts, precedents, disputes, legal research, advisory notes, and jurisdiction-specific legal references.
+summary: Law, contracts, precedents, disputes, and legal advisory notes.
+triggers:
+  - 법률
+  - 계약
+  - 소송
+  - 판례
+  - 내용증명
+  - legal
+  - contract
+  - litigation

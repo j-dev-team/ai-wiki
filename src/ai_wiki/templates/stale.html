@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ t('stale.title') }} - {{ wiki_name }}{% endblock %}
+{% block content %}
+<div class="stale-page">
+  <h1>{{ t('stale.title') }}</h1>
+
+  <form class="stale-form" method="get">
+    <label>{{ t('stale.not_verified_in') }}
+      <input type="number" name="days" value="{{ days }}" min="1" style="width:80px">
+      {{ t('stale.days') }}
+    </label>
+    <button type="submit" class="btn btn-small">{{ t('common.filter') }}</button>
+  </form>
+
+  {% if articles %}
+  <p class="result-count">{{ t('stale.need_review', count=articles|length) }}</p>
+  <ul class="article-list">
+    {% for a in articles %}
+    <li>
+      <a href="/article/{{ a.id }}">{{ a.title }}</a>
+      <div class="article-meta">
+        <span class="badge badge-cat">{{ a.category }}</span>
+        <span class="confidence">{{ "%.0f"|format(a.confidence * 100) }}%</span>
+        <span class="stale-days">{{ t('stale.days_ago', days=a.days_since_verified) }}</span>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">{{ t('stale.empty') }}</p>
+  {% endif %}
+</div>
+{% endblock %}

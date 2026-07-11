@@ -1,0 +1,14 @@
+package_name: corp-wiki
+display_name: 법인위키
+domain: corporate
+description: Corporate operations wiki for incorporations, registrations, articles of incorporation, shareholder meetings, board meetings, and corporate governance records.
+summary: Corporate operations, registration, governance, and company administration.
+triggers:
+  - 법인
+  - 법인등기
+  - 정관
+  - 주주총회
+  - 이사회
+  - 법인전환
+  - corporate
+  - governance

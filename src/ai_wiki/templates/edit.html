@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == 'create' %}{{ t('edit.new_title') }}{% else %}{{ t('edit.edit_title') }}: {{ article.title }}{% endif %} - {{ wiki_name }}{% endblock %}
+{% block content %}
+<div class="edit-page">
+  <h1>{% if mode == 'create' %}{{ t('edit.new_title') }}{% else %}{{ t('edit.edit_title') }}: {{ article.title }}{% endif %}</h1>
+
+  <form method="post" class="edit-form">
+    <input type="hidden" name="content_type" value="{{ content_type or '' }}">
+    {% if type_schemas %}
+    <div class="form-row">
+      <label for="type_select">{{ t('edit.content_type') }}</label>
+      <select id="type_select" name="type_select">
+        <option value="">{{ t('edit.select_type') }}</option>
+        {% for type_name in type_schemas %}
+        <option value="{{ type_name }}" {% if type_name == content_type %}selected{% endif %}>{{ type_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <div class="form-row">
+      <label for="title">{{ t('edit.title') }}</label>
+      <input type="text" id="title" name="title" required
+             value="{{ form.get('title') or (article.title if article else '') }}">
+    </div>
+
+    <div class="form-row">
+      <label for="category">{{ t('edit.category') }}</label>
+      <input type="text" id="category" name="category" required
+             placeholder="{{ t('edit.category_placeholder') }}"
+             value="{{ form.get('category') or (article.category if article else '') }}">
+    </div>
+
+    <div class="form-row">
+      <label for="tags">{{ t('edit.tags') }}</label>
+      <input type="text" id="tags" name="tags"
+             placeholder="{{ t('edit.tags_placeholder') }}"
+             value="{{ form.get('tags') or (article.tags|join(', ') if article else '') }}">
+    </div>
+
+    <div class="form-row-inline">
+      <div>
+        <label for="confidence">{{ t('edit.confidence') }}</label>
+        <input type="number" id="confidence" name="confidence" min="0" max="1" step="0.05"
+               value="{{ form.get('confidence') or (article.confidence if article else 0.8) }}">
+      </div>
+      <div>
+        <label for="author">{{ t('edit.author') }}</label>
+        <input type="text" id="author" name="author"
+               value="{{ form.get('author') or (article.author if article else 'human') }}">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="sources">{{ t('edit.sources') }}</label>
+      <textarea id="sources" name="sources" rows="3">{{ form.get('sources') or (article.sources|join('\n') if article else '') }}</textarea>
+    </div>
+
+    <div class="form-row">
+      <label for="content">{{ t('edit.content') }}</label>
+      <textarea id="content" name="content" rows="25" required class="yaml-editor"
+                placeholder="{{ t('edit.content_placeholder') }}">{{ form.get('content') or (article.content | yaml_dump if article else (content_template | yaml_dump if content_template else '')) }}</textarea>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-save">
+        {% if mode == 'create' %}{{ t('common.create') }}{% else %}{{ t('common.save') }}{% endif %}
+      </button>
+      <a href="/" class="btn btn-cancel">{{ t('common.cancel') }}</a>
+    </div>
+  </form>
+</div>
+
+{% if mode == 'create' %}
+<script>
+  const typeSelect = document.getElementById('type_select');
+  if (typeSelect) {
+    typeSelect.addEventListener('change', () => {
+      const typeName = typeSelect.value || 'technology';
+      window.location.href = "{{ url_for('create_article') }}" + "?type=" + encodeURIComponent(typeName);
+    });
+  }
+</script>
+{% endif %}
+{% endblock %}

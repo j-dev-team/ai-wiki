@@ -1,0 +1,68 @@
+title: About AI Wiki
+category: technology/ai
+tags:
+  - ai-wiki
+  - knowledge-management
+  - vector-search
+  - cli
+  - self-reference
+confidence: 0.95
+version: 1
+sources:
+  - https://github.com/j-dev-team/ai-wiki
+  - https://pypi.org/project/ai-wiki/
+author: ai-wiki
+content:
+  type: technology
+  what: >
+    AI Wiki is a CLI-based structured knowledge encyclopedia that stores, searches,
+    and manages knowledge accumulated by AI agents as YAML data. It solves the problem
+    of repeating the same research every session. Inspired by Karpathy's LLM Wiki idea,
+    it differs from traditional wikis in that the reader, editor, and manager are all LLMs.
+  language: python
+  facts:
+    - Python 3.11+ with Click CLI, SQLite FTS5, Flask Web UI, sqlite-vec vector search
+    - Inspired by Karpathy's LLM Wiki idea (2026-04); uses structured YAML instead of
+      Markdown to maximize AI readability
+    - 37 CLI commands including search, get, create, update, delete, verify, ingest,
+      lint, gaps, stale, history, reindex, quality, maintain, vsearch, vindex,
+      backlinks, sync-backlinks, similar, tags, tag, stats, discover, path, cluster,
+      list, init, destroy, upgrade-skill, export, export-all
+    - "Hybrid search: FTS5 keyword + vector (sentence-transformers/sqlite-vec) + RRF
+      (Reciprocal Rank Fusion) returning hybrid_score"
+    - "Agent skills: Claude Code (~/.claude/skills/), Gemini CLI (~/.gemini/skills/),
+      GPT Codex (~/.codex/skills/) — installed selectively at init"
+    - "Interactive init: language (en/ko) -> wiki name -> agent selection -> preset
+      (general/tech/business/research)"
+    - "Quality gates: reject create if fewer than 5 content keys, fewer than 200 chars,
+      or no sources"
+    - "Document maturity: stub -> draft -> review -> mature (completeness via schemas.py)"
+    - Git auto-commit on create/update/delete; web UI wiki name customization
+    - "Deployment: pip install ai-wiki (PyPI), MIT License, GitHub: j-dev-team/ai-wiki"
+  use_cases:
+    - Reuse knowledge across projects — search previously researched info in any session
+    - Fact checking — track mismatches between AI training knowledge and web results via _v
+    - Managing disputed topics — record evolution of consensus with disputes/historiography
+    - Automatic quality management — prevent stubs with quality gates, periodic checks with maintain
+  limitations:
+    - Vector search has a loading delay (~3s) on first call
+    - Local-only design — no auth/authorization, do not expose to external networks
+    - Requires Python 3.11 or higher
+  current_state:
+    pypi: pip install ai-wiki
+    github: https://github.com/j-dev-team/ai-wiki
+    license: MIT
+    python_requires: ">=3.11"
+    cli_commands: 37
+    skill_agents:
+      - Claude Code
+      - Gemini CLI
+      - GPT Codex
+  _meta:
+    maturity: mature
+    completeness: 0.92
+  _changelog:
+    - date: "2026-04-15T00:00:00Z"
+      action: created
+      fields: [what, facts, use_cases, limitations, current_state]
+      note: Seed document auto-generated during ai-wiki init
