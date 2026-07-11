@@ -79,7 +79,10 @@ def normalize_legacy_content(
         urls = raw.get("sources", [])
         if isinstance(urls, str):
             urls = [urls]
-        record["source_ids"] = [url_to_id[url] for url in urls if url in url_to_id]
+        record["source_ids"] = [
+            url_to_id[url] for url in urls
+            if isinstance(url, str) and url in url_to_id
+        ]
 
     history = []
     for item in legacy_history:

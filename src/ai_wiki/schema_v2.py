@@ -162,6 +162,8 @@ class ContentBlock(BaseModel):
         ]
         if missing:
             raise ValueError(f"missing required content fields: {', '.join(missing)}")
+        if self.type == "legacy":
+            return self
         wrong_lists = [key for key in _LIST_FIELDS if key in self.data and not isinstance(self.data[key], list)]
         wrong_dicts = [key for key in _DICT_FIELDS if key in self.data and not isinstance(self.data[key], dict)]
         if wrong_lists:

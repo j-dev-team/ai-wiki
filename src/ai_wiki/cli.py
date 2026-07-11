@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import json
 import os
 import re
 import shutil
@@ -13,11 +14,25 @@ logger = logging.getLogger(__name__)
 
 import click
 import yaml
+from pydantic import ValidationError
 
 from ai_wiki.runtime import get_runtime
 from ai_wiki.migration import migrate_article_files
 from ai_wiki.schema_v2 import document_json_schema
 from ai_wiki.yaml_loader import load_yaml_text
+from ai_wiki.agent_protocol import (
+    PROTOCOL_VERSION,
+    ProtocolFailure,
+    apply_json_patch,
+    build_context,
+    canonical_document,
+    compact_document,
+    failure as protocol_failure,
+    load_json_input,
+    project_fields,
+    success as protocol_success,
+    utc_now_text,
+)
 
 _RUNTIME = get_runtime()
 DEFAULT_WIKI_PRESET = _RUNTIME.default_preset
@@ -134,16 +149,26 @@ from ai_wiki.wikilog import append_log, migrate_legacy_log
 from ai_wiki.catalog import rebuild_catalog
 
 
+def _output_protocol_failure(exc: ProtocolFailure) -> None:
+    output_json(protocol_failure(
+        exc.code, exc.message, details=exc.details, retryable=exc.retryable,
+    ))
+    raise click.exceptions.Exit(1)
+
+
 # ── Skill version utilities ─────────────────────────────
 
 def _get_skill_version(skill_file: Path) -> "str | None":
-    """Extract version in '# version: X.Y.Z' format from the first line of a skill file."""
+    """Extract a skill version from frontmatter or a legacy comment."""
     try:
         with open(skill_file, "r", encoding="utf-8") as f:
-            first_line = f.readline().strip()
-        m = re.match(r"#\s*version:\s*(\S+)", first_line)
-        if m:
-            return m.group(1)
+            for _ in range(12):
+                line = f.readline()
+                if not line:
+                    break
+                m = re.match(r"(?:#\s*)?version:\s*(\S+)", line.strip())
+                if m:
+                    return m.group(1)
     except Exception:
         pass
     return None
@@ -860,24 +885,173 @@ def list_articles(ctx, sort, category, limit, offset):
 @cli.command()
 @click.argument("article_id")
 @click.option("--meta-only", is_flag=True, help="Return metadata only")
+@click.option("--view", type=click.Choice(["compact", "full", "raw"]), default="compact",
+              show_default=True, help="AI document view")
+@click.option("--fields", default=None, help="Comma-separated compact field projections")
+@click.option("--legacy", is_flag=True, help="Return the v0.3 response for compatibility")
 @click.pass_context
-def get(ctx, article_id, meta_only):
+def get(ctx, article_id, meta_only, view, fields, legacy):
     """Retrieve a document by ID."""
     idx: WikiIndex = ctx.obj["index"]
-    article = load_article(article_id)
+    article, path = load_article_with_path(article_id)
     if not article:
-        output_error(msg("not_found", article_id), "not_found")
+        if legacy:
+            output_error(msg("not_found", article_id), "not_found")
+        _output_protocol_failure(ProtocolFailure("not_found", msg("not_found", article_id)))
 
     idx.log_access("get", article_id=article_id)
-    if meta_only:
+    if legacy and meta_only:
         output_json({"status": "ok", "article": article.meta_dict()})
-    else:
+        return
+    if legacy:
         output_json({"status": "ok", "article": article.to_dict()})
+        return
+    try:
+        if meta_only:
+            document = article.meta_dict()
+        elif view == "full":
+            document = canonical_document(article)
+        elif view == "raw":
+            document = {
+                "id": article.id,
+                "version": article.version,
+                "raw_yaml": path.read_text(encoding="utf-8") if path else "",
+            }
+        else:
+            document, _ = compact_document(article)
+            document = project_fields(document, fields)
+        output_json(protocol_success({"document": document}, meta={"view": view}))
+    except ProtocolFailure as exc:
+        _output_protocol_failure(exc)
 
 
 @cli.command()
-@click.option("--title", "-t", required=True, help="Document title")
-@click.option("--category", "-c", required=True, help="Category")
+def capabilities():
+    """Describe the stable AI protocol and available operations."""
+    output_json(protocol_success({
+        "protocol_version": PROTOCOL_VERSION,
+        "commands": {
+            "get": {"views": ["compact", "full", "raw"], "default": "compact"},
+            "context": {"default_max_tokens": 4000, "default_limit": 8},
+            "record-use": {"outcomes": ["answered", "insufficient"]},
+            "patch": {"operations": ["test", "add", "replace", "remove"], "if_version_required": True},
+            "create": {"document_file": "JSON path or - for stdin"},
+        },
+        "content_types": sorted(TYPE_SCHEMAS),
+        "schema": document_json_schema(),
+    }))
+
+
+@cli.command("context")
+@click.argument("query")
+@click.option("--max-tokens", default=4000, type=int, show_default=True)
+@click.option("--limit", default=8, type=int, show_default=True)
+@click.option("--category", default=None)
+@click.option("--tag", "tags", multiple=True)
+@click.option("--include-unverified", is_flag=True)
+@click.pass_context
+def context_cmd(ctx, query, max_tokens, limit, category, tags, include_unverified):
+    """Build an evidence-linked context package within a token budget."""
+    try:
+        envelope = build_context(
+            ctx.obj["index"], query, max_tokens=max_tokens, limit=limit,
+            category=category, tags=list(tags) or None,
+            include_unverified=include_unverified,
+        )
+        output_json(envelope)
+    except ProtocolFailure as exc:
+        _output_protocol_failure(exc)
+
+
+@cli.command("record-use")
+@click.argument("context_id")
+@click.option("--citation", "citations", multiple=True)
+@click.option("--outcome", type=click.Choice(["answered", "insufficient"]), required=True)
+@click.pass_context
+def record_use(ctx, context_id, citations, outcome):
+    """Record which context citations an agent actually used."""
+    try:
+        result = ctx.obj["index"].record_context_usage(context_id, list(citations), outcome)
+        output_json(protocol_success(result))
+    except ValueError as exc:
+        if str(exc) == "context_not_found":
+            _output_protocol_failure(ProtocolFailure("context_not_found", "Context ID was not found"))
+        try:
+            unknown = json.loads(str(exc))
+        except json.JSONDecodeError:
+            unknown = []
+        _output_protocol_failure(ProtocolFailure(
+            "invalid_citation", "Citation was not issued for this context", details={"unknown": unknown},
+        ))
+
+
+@cli.command("patch")
+@click.argument("article_id")
+@click.option("--operations-file", required=True, help="JSON Patch file or - for stdin")
+@click.option("--if-version", required=True, type=int)
+@click.option("--dry-run", is_flag=True)
+@click.pass_context
+def patch_article(ctx, article_id, operations_file, if_version, dry_run):
+    """Apply a validated RFC 6902 subset with optimistic concurrency."""
+    idx: WikiIndex = ctx.obj["index"]
+    article, old_path = load_article_with_path(article_id)
+    if not article:
+        _output_protocol_failure(ProtocolFailure("not_found", msg("not_found", article_id)))
+    if article.version != if_version:
+        _output_protocol_failure(ProtocolFailure(
+            "version_conflict", "Document version changed",
+            details={"expected": if_version, "current": article.version}, retryable=True,
+        ))
+    try:
+        operations = load_json_input(operations_file)
+        before_document = canonical_document(article)
+        patched, changed = apply_json_patch(before_document, operations)
+        patched["metadata"]["document_version"] = article.version + 1
+        patched["metadata"]["modified_at"] = utc_now_text()
+        patched.setdefault("history", []).append({
+            "at": utc_now_text(), "action": "patched", "fields": changed,
+            "note": "AI protocol JSON Patch",
+        })
+        updated = Article.from_yaml(patched)
+        before_quality = quality_validate(article)
+        after_quality = quality_validate(updated)
+        if (after_quality.quality_score < before_quality.quality_score or
+                len(after_quality.errors) > len(before_quality.errors)):
+            raise ProtocolFailure(
+                "quality_regression", "Patch would reduce document quality",
+                details={"before": before_quality.to_dict(), "after": after_quality.to_dict()},
+            )
+        compact, _ = compact_document(updated)
+        response = {
+            "article_id": article_id,
+            "previous_version": article.version,
+            "version": updated.version,
+            "changed_paths": changed,
+            "dry_run": dry_run,
+            "document": compact,
+            "quality": after_quality.to_dict(),
+        }
+        if dry_run:
+            output_json(protocol_success(response))
+            return
+        atomic_update(updated, old_path, idx)
+        rebuild_catalog()
+        _vector_upsert(updated)
+        git_auto_commit("patch", article_id, updated.title)
+        append_log("patch", article_id=article_id, title=updated.title,
+                   details=f"v{updated.version} paths={changed}")
+        output_json(protocol_success(response))
+    except ProtocolFailure as exc:
+        _output_protocol_failure(exc)
+    except (ValidationError, ValueError, OSError) as exc:
+        _output_protocol_failure(ProtocolFailure(
+            "validation_failed", "Patched document failed validation", details=str(exc),
+        ))
+
+
+@cli.command()
+@click.option("--title", "-t", required=False, help="Document title")
+@click.option("--category", "-c", required=False, help="Category")
 @click.option("--tags", default="", help="Comma-separated tags")
 @click.option("--confidence", default=0.8, type=float, help="Confidence score (0.0-1.0)")
 @click.option("--source", "-s", multiple=True, help="Source URL")
@@ -887,11 +1061,102 @@ def get(ctx, article_id, meta_only):
               help="YAML content file")
 @click.option("--content-stdin", is_flag=True, help="Read YAML content from stdin")
 @click.option("--force", is_flag=True, help="Ignore duplicate warning")
+@click.option("--document-file", default=None, help="AI JSON document file or - for stdin")
+@click.option("--dry-run", is_flag=True, help="Validate without writing (document mode)")
 @click.pass_context
 def create(ctx, title, category, tags, confidence, source, related, author,
-           content_file, content_stdin, force):
+           content_file, content_stdin, force, document_file, dry_run):
     """Create a new document. Content must be YAML structured data."""
     idx: WikiIndex = ctx.obj["index"]
+
+    if document_file is not None:
+        if any([title, category, tags, source, related, content_file, content_stdin, force]):
+            _output_protocol_failure(ProtocolFailure(
+                "conflicting_input", "--document-file cannot be combined with legacy create options",
+            ))
+        try:
+            payload = load_json_input(document_file)
+            if not isinstance(payload, dict):
+                raise ProtocolFailure("invalid_document", "Document input must be a JSON object")
+            if payload.get("schema_version") == 2:
+                article = Article.from_yaml(payload)
+            else:
+                doc_title = payload.get("title")
+                doc_category = payload.get("category")
+                doc_content = payload.get("content")
+                if not doc_title or not doc_category or not isinstance(doc_content, dict):
+                    raise ProtocolFailure(
+                        "invalid_document", "title, category, and content object are required",
+                    )
+                if set(doc_content) == {"type", "data"} and isinstance(doc_content["data"], dict):
+                    doc_content = {"type": doc_content["type"], **doc_content["data"]}
+                raw_sources = payload.get("sources", [])
+                source_urls = [
+                    item["url"] if isinstance(item, dict) else item for item in raw_sources
+                ]
+                article = Article(
+                    id=payload.get("id") or generate_id(doc_title, doc_category),
+                    title=doc_title, category=doc_category, content=doc_content,
+                    tags=payload.get("tags", []), confidence=float(payload.get("confidence", 0.8)),
+                    sources=source_urls, related=payload.get("related", []),
+                    author=payload.get("author", "ai-agent"),
+                )
+            similar = idx.find_similar_titles(article.title)
+            if similar:
+                _output_protocol_failure(ProtocolFailure(
+                    "duplicate_conflict", "A similar document already exists",
+                    details={"candidates": similar}, retryable=True,
+                ))
+            if not article.sources:
+                article.confidence = min(article.confidence, 0.5)
+                article.metadata["verification_status"] = "pending"
+                article.verification = [{
+                    "path": "/content/data", "level": "unverified",
+                    "source_ids": [], "note": "Awaiting source verification",
+                }]
+            elif not article.verification:
+                article.verification = [{
+                    "path": "/content/data", "level": "sourced",
+                    "source_ids": [f"src-{index}" for index in range(1, len(article.sources) + 1)],
+                }]
+            canonical_document(article)
+            report = quality_validate(article)
+            blocking = [error for error in report.errors if not (
+                not article.sources and error.code == "MIN_SOURCES"
+            )]
+            if blocking:
+                raise ProtocolFailure(
+                    "quality_rejected", "Document failed the AI quality gate",
+                    details=report.to_dict(),
+                )
+            compact, _ = compact_document(article)
+            response = {
+                "article_id": article.id, "dry_run": dry_run,
+                "verification_status": article.metadata.get("verification_status", "active"),
+                "document": compact, "quality": report.to_dict(),
+            }
+            if dry_run:
+                output_json(protocol_success(response))
+                return
+            file_path = atomic_save(article, idx)
+            rebuild_catalog()
+            _vector_upsert(article)
+            git_auto_commit("create", article.id, article.title)
+            append_log("create", article_id=article.id, title=article.title, author=article.author)
+            response["file_path"] = get_relative_path(file_path)
+            output_json(protocol_success(response))
+            return
+        except ProtocolFailure as exc:
+            _output_protocol_failure(exc)
+        except (ValidationError, ValueError, OSError) as exc:
+            _output_protocol_failure(ProtocolFailure(
+                "validation_failed", "Document failed validation", details=str(exc),
+            ))
+
+    if dry_run:
+        output_error("--dry-run is only supported with --document-file", "invalid_input")
+    if not title or not category:
+        output_error("--title and --category are required in legacy create mode", "invalid_input")
 
     content = _read_yaml_content(content_file, content_stdin)
     if content is None:

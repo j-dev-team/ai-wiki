@@ -55,7 +55,11 @@ def test_create_and_get(tmp_path):
     result = _run(runner, ["get", article_id], wiki_root)
     data = json.loads(result.output)
     assert data["status"] == "ok"
-    assert data["article"]["title"] == "Test CLI Article"
+    assert data["protocol_version"] == "1.0"
+    assert data["data"]["document"]["title"] == "Test CLI Article"
+
+    legacy = _run(runner, ["get", article_id, "--legacy"], wiki_root)
+    assert json.loads(legacy.output)["article"]["title"] == "Test CLI Article"
 
 
 def test_search(tmp_path):

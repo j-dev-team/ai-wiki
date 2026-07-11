@@ -68,6 +68,25 @@ class WikiIndex:
                 result_count INTEGER DEFAULT 0,
                 timestamp TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS context_sessions (
+                context_id TEXT PRIMARY KEY,
+                query TEXT NOT NULL,
+                document_ids TEXT NOT NULL,
+                citations TEXT NOT NULL,
+                max_tokens INTEGER NOT NULL,
+                estimated_tokens INTEGER NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS context_usage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                context_id TEXT NOT NULL,
+                outcome TEXT NOT NULL,
+                citations TEXT NOT NULL,
+                recorded_at TEXT NOT NULL,
+                FOREIGN KEY (context_id) REFERENCES context_sessions(context_id)
+            );
         """)
         # 기존 DB 마이그레이션: 새 컬럼 추가
         for col, definition in [
@@ -83,6 +102,36 @@ class WikiIndex:
             except sqlite3.OperationalError:
                 pass
         self.conn.commit()
+
+    def record_context(self, *, context_id: str, query: str, document_ids: list[str],
+                       citations: list[str], max_tokens: int, estimated_tokens: int) -> None:
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.conn.execute(
+            """INSERT INTO context_sessions
+               (context_id, query, document_ids, citations, max_tokens, estimated_tokens, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (context_id, query, json.dumps(document_ids, ensure_ascii=False),
+             json.dumps(citations, ensure_ascii=False), max_tokens, estimated_tokens, now),
+        )
+        self.conn.commit()
+
+    def record_context_usage(self, context_id: str, citations: list[str], outcome: str) -> dict:
+        row = self.conn.execute(
+            "SELECT document_ids, citations FROM context_sessions WHERE context_id = ?", (context_id,)
+        ).fetchone()
+        if not row:
+            raise ValueError("context_not_found")
+        allowed = set(json.loads(row["citations"]))
+        unknown = sorted(set(citations) - allowed)
+        if unknown:
+            raise ValueError(json.dumps(unknown, ensure_ascii=False))
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.conn.execute(
+            "INSERT INTO context_usage (context_id, outcome, citations, recorded_at) VALUES (?, ?, ?, ?)",
+            (context_id, outcome, json.dumps(citations, ensure_ascii=False), now),
+        )
+        self.conn.commit()
+        return {"context_id": context_id, "outcome": outcome, "citations": citations, "recorded_at": now}
 
     def _reconcile_pending_updates(self) -> None:
         """Recover YAML-to-index updates interrupted between file and DB commits."""

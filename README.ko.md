@@ -1,10 +1,10 @@
 # AI Wiki - AI 에이전트용 구조화 지식 위키
 
-AI Wiki는 AI 에이전트가 조사한 지식을 로컬 파일 시스템에 **구조화된 YAML 문서**로 저장하고, CLI와 웹 UI에서 검색/관리할 수 있게 해주는 지식 위키입니다.
+AI Wiki는 AI가 지식을 검색하고 읽고 부분 수정하며 재사용하는 **AI 중심 백과사전**입니다. YAML은 영속 원본이고 Codex·Claude·Gemini는 안정적인 CLI JSON 프로토콜을 사용합니다. 웹 UI는 사람이 검토하는 보조 기능입니다.
 
 [English README](https://github.com/j-dev-team/ai-wiki/blob/master/README.md)
 
-[AI Wiki 0.3 통합 사용설명서](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md) | [목적별 독립 위키 안내](https://github.com/j-dev-team/ai-wiki/blob/master/docs/VARIANTS.md)
+[AI Wiki 0.4 통합 사용설명서](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md) | [목적별 독립 위키 안내](https://github.com/j-dev-team/ai-wiki/blob/master/docs/VARIANTS.md)
 
 > 보안 안내: AI Wiki는 인증/권한 관리 기능이 없습니다. 로컬 전용 도구로 사용하세요. 웹 UI나 데이터 디렉터리를 외부 네트워크에 노출하지 마세요. 데이터는 로컬 파일에 평문으로 저장됩니다.
 
@@ -56,7 +56,7 @@ pip install -e ".[test]"
 ai-wiki init D:\wiki\my-wiki
 
 # 검색
-ai-wiki search "python testing"
+ai-wiki context "python testing" --max-tokens 4000
 
 # 문서 목록
 ai-wiki list
@@ -109,6 +109,11 @@ ai-wiki create `
 
 | 명령 | 설명 |
 | --- | --- |
+| `ai-wiki capabilities` | AI 프로토콜·스키마·지원 기능 확인 |
+| `ai-wiki context "질문"` | 토큰 예산 내 근거·출처·citation 생성 |
+| `ai-wiki patch <id> ... --if-version N` | 충돌 방지 부분 수정 |
+| `ai-wiki record-use <context-id> ...` | AI가 실제 사용한 근거 기록 |
+| `ai-wiki create --document-file 문서.json` | AI JSON 문서 검증·생성 |
 | `ai-wiki init [path]` | 위키 디렉터리와 설정 초기화 |
 | `ai-wiki create` | YAML 문서 생성 |
 | `ai-wiki get <id>` | 문서 조회 |

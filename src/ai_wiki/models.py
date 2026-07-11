@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse
+
+from pydantic import ValidationError
 
 from ai_wiki.schema_v2 import SCHEMA_VERSION, validate_v2_document
 
@@ -70,28 +73,73 @@ class Article:
 
         if not isinstance(self.content, dict):
             raise ValueError("content must be a mapping")
-        existing_sources = {item.get("url"): item for item in self.source_records}
+        existing_sources = {
+            item.get("url"): item for item in self.source_records
+            if isinstance(item, dict) and isinstance(item.get("url"), str)
+        }
         source_records = []
+        invalid_sources = []
         used_source_ids: set[str] = set()
-        for index, url in enumerate(self.sources, start=1):
-            record = dict(existing_sources.get(url, {}))
+        for index, raw_source in enumerate(self.sources, start=1):
+            url = raw_source.get("url") if isinstance(raw_source, dict) else raw_source
+            parsed = urlparse(url) if isinstance(url, str) else None
+            if not parsed or parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                invalid_sources.append(raw_source)
+                continue
+            record = (
+                dict(raw_source) if isinstance(raw_source, dict)
+                else dict(existing_sources.get(url, {}))
+            )
             source_id = record.get("id") or f"src-{index}"
             while source_id in used_source_ids:
                 source_id = f"src-{index}-{len(used_source_ids) + 1}"
             record.update({"id": source_id, "url": url})
             used_source_ids.add(source_id)
             source_records.append(record)
-        existing_relations = {item.get("target_id"): item for item in self.relations}
+        existing_relations = {
+            item.get("target_id"): item for item in self.relations
+            if isinstance(item, dict) and isinstance(item.get("target_id"), str)
+        }
         relations = [
             dict(existing_relations.get(target, {}), target_id=target)
-            for target in self.related
+            for target in self.related if isinstance(target, str) and target
         ]
         from ai_wiki.migration import normalize_legacy_content
         content, legacy_verification, legacy_meta, legacy_history = normalize_legacy_content(
             self.content, source_records
         )
         content_type = content.pop("type", "")
+        original_content_type = content_type if isinstance(content_type, str) else str(content_type)
+        from ai_wiki.schema_v2 import ContentBlock
+        try:
+            ContentBlock.model_validate(
+                {"type": original_content_type, "data": content}, strict=True
+            )
+            content_type = original_content_type
+        except ValidationError:
+            content_type = "legacy"
+            content = {"original_type": original_content_type or "unspecified", **content}
         completeness, _, _ = compute_completeness(self.content)
+        raw_maturity = self.metadata.get("maturity", legacy_meta.get("maturity"))
+        maturity_aliases = {
+            "developing": "draft", "reviewed": "review",
+            "authoritative": "mature", "complete": "mature",
+            "comprehensive": "mature", "detailed": "mature",
+            "enriched": "mature", "published": "mature",
+            "reference": "mature", "verified": "mature",
+        }
+        maturity = maturity_aliases.get(raw_maturity, raw_maturity) if isinstance(raw_maturity, str) else None
+        if maturity not in {"stub", "draft", "review", "mature"}:
+            maturity = determine_maturity(
+                completeness, len(source_records), len(relations), self.confidence
+            )
+        raw_completeness = self.metadata.get(
+            "completeness", legacy_meta.get("completeness", completeness)
+        )
+        try:
+            normalized_completeness = min(1.0, max(0.0, float(raw_completeness)))
+        except (TypeError, ValueError):
+            normalized_completeness = completeness
         metadata = {
             "confidence": self.confidence,
             "document_version": self.version,
@@ -99,16 +147,8 @@ class Article:
             "modified_at": self._fmt(self.last_modified),
             "verified_at": self._fmt(self.last_verified),
             "author": self.author,
-            "maturity": self.metadata.get(
-                "maturity",
-                legacy_meta.get(
-                    "maturity",
-                    determine_maturity(completeness, len(source_records), len(relations), self.confidence),
-                ),
-            ),
-            "completeness": self.metadata.get(
-                "completeness", legacy_meta.get("completeness", completeness)
-            ),
+            "maturity": maturity,
+            "completeness": normalized_completeness,
         }
         extensions = dict(self.extensions)
         extra_metadata = {
@@ -117,6 +157,80 @@ class Article:
         }
         if extra_metadata:
             extensions["system_metadata"] = extra_metadata
+        normalization = {}
+        if invalid_sources:
+            normalization["invalid_sources"] = invalid_sources
+        if content_type == "legacy":
+            normalization["content_type"] = {
+                "original": original_content_type or None,
+                "reason": "legacy content did not satisfy the registered v2 type contract",
+            }
+        if raw_maturity not in (None, maturity):
+            normalization["maturity"] = {"original": raw_maturity, "normalized": maturity}
+
+        valid_source_ids = {record["id"] for record in source_records}
+        verification = []
+        verification_aliases = {
+            "confirmed": "verified", "official": "sourced", "reported": "sourced",
+            "synthesized": "corroborated", "mixed": "disputed",
+        }
+        invalid_verification = []
+        for raw in self.verification or legacy_verification:
+            if not isinstance(raw, dict):
+                invalid_verification.append(raw)
+                continue
+            record = dict(raw)
+            original_level = record.get("level", "unverified")
+            record["level"] = verification_aliases.get(original_level, original_level)
+            if record["level"] not in {
+                "unverified", "sourced", "corroborated", "verified", "disputed",
+                "human_verified",
+            }:
+                record["level"] = "unverified"
+                record["note"] = (
+                    f"Legacy verification level: {original_level}. " + str(record.get("note", ""))
+                ).strip()
+            path = record.get("path")
+            record["path"] = path if isinstance(path, str) and path.startswith("/") else "/content/data"
+            source_ids = record.get("source_ids", [])
+            record["source_ids"] = [
+                value for value in source_ids
+                if isinstance(value, str) and value in valid_source_ids
+            ] if isinstance(source_ids, list) else []
+            if record.get("verified_at"):
+                try:
+                    record["verified_at"] = self._fmt(self._parse_dt(record["verified_at"]))
+                except (TypeError, ValueError):
+                    invalid_verification.append(raw)
+                    record.pop("verified_at", None)
+            verification.append(record)
+
+        history = []
+        invalid_history = []
+        for raw in self.history or legacy_history:
+            if not isinstance(raw, dict):
+                invalid_history.append(raw)
+                continue
+            record = dict(raw)
+            try:
+                record["at"] = self._fmt(self._parse_dt(record.get("at")))
+            except (TypeError, ValueError):
+                invalid_history.append(raw)
+                record["at"] = self._fmt(self.last_modified)
+                record["note"] = (
+                    f"Legacy history date was invalid: {raw.get('at')!r}. " + str(record.get("note", ""))
+                ).strip()
+            record["action"] = str(record.get("action") or "legacy_change")
+            fields = record.get("fields", [])
+            record["fields"] = [str(value) for value in fields] if isinstance(fields, list) else []
+            record["note"] = str(record.get("note", ""))
+            history.append(record)
+        if invalid_verification:
+            normalization["invalid_verification"] = invalid_verification
+        if invalid_history:
+            normalization["invalid_history"] = invalid_history
+        if normalization:
+            extensions["legacy_normalization"] = normalization
         document = {
             "schema_version": SCHEMA_VERSION,
             "id": self.id,
@@ -127,8 +241,8 @@ class Article:
             "sources": source_records,
             "relations": relations,
             "content": {"type": content_type, "data": content},
-            "verification": self.verification or legacy_verification,
-            "history": self.history or legacy_history,
+            "verification": verification,
+            "history": history,
             "extensions": extensions,
         }
         return validate_v2_document(document).model_dump(mode="json", exclude_none=True)

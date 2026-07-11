@@ -195,7 +195,7 @@ class TestHumanVerification:
         runner = CliRunner()
         article_id = _create_sample(runner, wiki_root)
         runner.invoke(cli, ["verify", article_id, "--human", "--by", "reviewer1"])
-        result = runner.invoke(cli, ["get", article_id])
+        result = runner.invoke(cli, ["get", article_id, "--legacy"])
         data = json.loads(result.output)
         meta = data["article"].get("content", {}).get("_meta", {})
         assert meta.get("human_verified") is True

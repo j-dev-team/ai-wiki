@@ -7,6 +7,10 @@ from __future__ import annotations
 #              / (required 수 * 1.0 + optional 수 * 0.5)
 
 TYPE_SCHEMAS: dict[str, dict[str, list[str]]] = {
+    "legacy": {
+        "required": ["type", "original_type"],
+        "optional": [],
+    },
     "technology": {
         "required": ["type", "what", "facts"],
         "optional": ["language", "framework", "use_cases", "limitations",

@@ -38,6 +38,9 @@
         {% if article.content.type %}
         <span class="badge badge-type">{{ article.content.type }}</span>
         {% endif %}
+        {% if article.metadata.get('verification_status') == 'pending' %}
+        <span class="badge badge-maturity badge-maturity-draft">Pending verification</span>
+        {% endif %}
         {% if quality %}
         <span class="badge badge-maturity badge-maturity-{{ quality.maturity }}">{{ quality.maturity }}</span>
         {% endif %}
@@ -185,6 +188,13 @@
         </div>
         {% endfor %}
       </div>
+    </details>
+    {% endif %}
+
+    {% if article.history %}
+    <details class="meta-panel">
+      <summary>Normalized history ({{ article.history|length }})</summary>
+      <pre><code>{{ article.history | yaml_dump }}</code></pre>
     </details>
     {% endif %}
 

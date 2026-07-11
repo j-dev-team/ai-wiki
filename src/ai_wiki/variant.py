@@ -399,7 +399,7 @@ def _find_installed_command(command_name: str, python_executable: str | None = N
 def _write_variant_module(target_dir: Path, spec: VariantSpec) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
     runtime_spec = repr(spec.as_dict())
-    (target_dir / "__init__.py").write_text('__version__ = "0.3.0"\n', encoding="utf-8")
+    (target_dir / "__init__.py").write_text('__version__ = "0.4.0"\n', encoding="utf-8")
     (target_dir / "cli.py").write_text(
         "from pathlib import Path\n\n"
         "from ai_wiki.runtime import activate_variant\n\n"
@@ -435,12 +435,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "{spec.package_name}"
-version = "0.3.0"
+version = "0.4.0"
 description = "{_toml_string(spec.description)}"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-dependencies = ["ai-wiki>=0.3,<0.4"]
+dependencies = ["ai-wiki>=0.4,<0.5"]
 
 [project.scripts]
 {spec.command_name} = "{spec.module_name}.cli:cli"
@@ -531,14 +531,15 @@ def _render_skill(spec: VariantSpec) -> str:
     )
     return f"""---
 name: {spec.skill_name}
+version: 0.4.0
 description: {spec.description} Use this skill whenever the request is about {trigger_text} knowledge, research, records, or retrieval in this dedicated domain. {routing_text}
 user-invocable: true
-argument-hint: "[search|get|create|update|vsearch|doctor|todo|maintain] [query or options]"
+argument-hint: "[capabilities|context|get|record-use|patch|create] [query or options]"
 ---
 
 # {spec.display_name} Skill
 
-{spec.display_name} is a dedicated AI Wiki variant. It stores structured YAML documents and exposes keyword search, vector search, quality checks, and maintenance commands through the `{spec.command_name}` CLI.
+{spec.display_name} is an AI-operated encyclopedia with an isolated YAML source of truth and a stable CLI JSON protocol.
 
 ## When To Use
 
@@ -548,21 +549,21 @@ Use this skill when the user asks about knowledge or records in this domain:
 - triggers: {trigger_text}
 - reusable notes, research, explanations, entity records, decisions, and follow-up context for this wiki
 
-## Required First Step
+## Mandatory Workflow
 
-Before answering from reusable knowledge, search the wiki:
-
-```bash
-{spec.command_name} search "query"
-```
-
-If wording may differ from the stored article, also use semantic search:
+Before answering, retrieve an evidence-linked context package:
 
 ```bash
-{spec.command_name} vsearch "semantic query"
+{spec.command_name} context "question" --max-tokens 4000
 ```
 
-Use found documents as context and mention document IDs when they materially support the answer.
+Answer using returned citation keys, then record actual use:
+
+```bash
+{spec.command_name} record-use <context-id> --citation "doc:<id>#<path>" --outcome answered
+```
+
+If context is insufficient, record that outcome, research, patch or create reusable knowledge, and run context again. Never delete autonomously.
 
 ## Routing Priority
 
@@ -571,26 +572,23 @@ Use found documents as context and mention document IDs when they materially sup
 ## Common Commands
 
 ```bash
-{spec.command_name} doctor
-{spec.command_name} search "query"
-{spec.command_name} vsearch "semantic query"
+{spec.command_name} capabilities
+{spec.command_name} context "question" --max-tokens 4000
 {spec.command_name} get <document-id>
-{spec.command_name} template technology --output content.yaml
-{spec.command_name} create --title "..." --category "{spec.domain}/..." --source "https://..." --content-file content.yaml
-{spec.command_name} update <document-id> --content-file content.yaml --source "https://..."
+{spec.command_name} patch <document-id> --operations-file patch.json --if-version <version> --dry-run
+{spec.command_name} create --document-file document.json --dry-run
+{spec.command_name} record-use <context-id> --citation "doc:<id>#<path>" --outcome answered
+{spec.command_name} doctor
 {spec.command_name} quality <document-id>
-{spec.command_name} todo
-{spec.command_name} maintain
-{spec.command_name} vindex
 ```
 
 ## Storage Rules
 
-When creating or updating knowledge:
+When writing knowledge:
 
-- use structured YAML, not prose-only notes
+- use the JSON create/patch protocol; YAML is the internal source of truth
 - include sources for factual claims whenever possible
 - mark uncertainty with lower `confidence`, `limitations`, or verification metadata
 - prefer categories under `{spec.domain}/...`
-- run `{spec.command_name} quality <id>` after significant edits
+- treat `version_conflict` and `duplicate_conflict` as required re-read decisions
 """

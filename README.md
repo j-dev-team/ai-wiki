@@ -19,6 +19,11 @@ AI coding agents (Claude Code, Gemini CLI, GPT Codex) have no built-in way to re
 
 ## Features
 
+- **AI-First Protocol** — Stable JSON envelopes for deterministic agent reading and writing
+- **Budgeted Context** — Hybrid evidence packages constrained to an agent token budget
+- **Evidence Citations** — Document ID + JSON Pointer citations linked to source verification
+- **Safe Partial Writes** — RFC 6902 patching with optimistic version checks and quality gates
+- **Autonomous Writeback** — Validated creation and pending drafts without full-document replacement
 - **Structured YAML Storage** — Accumulate knowledge as key-value structured data, not markdown prose
 - **FTS5 Full-Text Search** — SQLite FTS5-based keyword search for Korean and English
 - **Vector Semantic Search** — `sentence-transformers` + `sqlite-vec` embedding search
@@ -53,6 +58,31 @@ ai-wiki upgrade-skill
 ai-wiki vindex
 ai-wiki doctor
 ```
+
+## AI Agent Workflow
+
+Agents use `context` instead of manually chaining keyword and vector search.
+Every primary command returns a stable JSON envelope.
+
+```bash
+ai-wiki capabilities
+ai-wiki context "How does optimistic concurrency protect wiki updates?" --max-tokens 4000
+ai-wiki get <document-id> --fields id,title,content.facts,sources
+ai-wiki record-use <context-id> --citation "doc:<id>#/content/data/facts" --outcome answered
+```
+
+Reusable knowledge can be written without replacing the whole document:
+
+```bash
+ai-wiki patch <document-id> --operations-file patch.json --if-version 3 --dry-run
+ai-wiki patch <document-id> --operations-file patch.json --if-version 3
+ai-wiki create --document-file document.json --dry-run
+ai-wiki create --document-file document.json
+```
+
+Source-free knowledge is stored as a low-confidence pending draft and excluded
+from normal context retrieval. Existing v1 files are not rewritten by reads;
+only a successfully modified document is saved as v2.
 
 ### Developer Installation (source)
 

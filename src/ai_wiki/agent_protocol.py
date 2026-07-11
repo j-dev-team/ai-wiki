@@ -1,0 +1,365 @@
+"""Stable, model-neutral protocol helpers for AI Wiki agents."""
+from __future__ import annotations
+
+import copy
+import json
+import math
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from ai_wiki.models import Article
+
+PROTOCOL_VERSION = "1.0"
+DEFAULT_CONTEXT_TOKENS = 4000
+MIN_CONTEXT_TOKENS = 256
+MAX_CONTEXT_TOKENS = 100_000
+
+COMPACT_CONTENT_PRIORITY = (
+    "what", "summary", "definition", "answer", "facts", "key_principles",
+    "solution", "key_provisions", "steps", "use_cases", "applications",
+    "limitations", "caveats", "best_practices", "conclusion", "status",
+)
+PROTECTED_PATCH_PATHS = {
+    "/schema_version", "/id", "/metadata/document_version",
+    "/metadata/created_at",
+}
+
+
+class ProtocolFailure(ValueError):
+    def __init__(self, code: str, message: str, *, details: Any = None,
+                 retryable: bool = False):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.details = details
+        self.retryable = retryable
+
+
+def success(data: Any, *, meta: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "protocol_version": PROTOCOL_VERSION,
+        "status": "ok",
+        "data": data,
+        "meta": meta or {},
+        "error": None,
+    }
+
+
+def failure(code: str, message: str, *, details: Any = None,
+            retryable: bool = False, meta: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "protocol_version": PROTOCOL_VERSION,
+        "status": "error",
+        "data": None,
+        "meta": meta or {},
+        "error": {
+            "code": code,
+            "message": message,
+            "retryable": retryable,
+            "details": details,
+        },
+    }
+
+
+def estimate_tokens(value: Any) -> int:
+    """Conservative provider-neutral estimate based on serialized UTF-8 bytes."""
+    raw = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return max(1, math.ceil(len(raw) / 2))
+
+
+def canonical_document(article: Article) -> dict[str, Any]:
+    return article.to_yaml_dict()
+
+
+def is_unverified_draft(article: Article) -> bool:
+    status = article.metadata.get("verification_status")
+    if not status:
+        status = article.extensions.get("system_metadata", {}).get("verification_status")
+    return status == "pending"
+
+
+def compact_document(article: Article, *, score: float | None = None,
+                     selection_reason: str | None = None) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    canonical = canonical_document(article)
+    content_data = canonical["content"]["data"]
+    compact_content = {
+        key: copy.deepcopy(content_data[key])
+        for key in COMPACT_CONTENT_PRIORITY if key in content_data
+    }
+    if not compact_content:
+        for key in list(content_data)[:5]:
+            compact_content[key] = copy.deepcopy(content_data[key])
+
+    sources = [
+        {key: source[key] for key in ("id", "url", "title") if key in source}
+        for source in canonical.get("sources", [])
+    ]
+    source_ids = {source["id"] for source in sources}
+    citations: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    def pointer_exists(path: str) -> bool:
+        current: Any = canonical
+        try:
+            for part in _decode_pointer(path):
+                current = current[int(part)] if isinstance(current, list) else current[part]
+            return True
+        except (KeyError, IndexError, ValueError, TypeError, ProtocolFailure):
+            return False
+
+    for verification in canonical.get("verification", []):
+        valid_ids = [item for item in verification.get("source_ids", []) if item in source_ids]
+        path = verification.get("path", "/content/data")
+        if not pointer_exists(path):
+            continue
+        key = f"doc:{article.id}#{path}"
+        if key in seen:
+            continue
+        seen.add(key)
+        citations.append({
+            "key": key,
+            "document_id": article.id,
+            "path": path,
+            "level": verification.get("level", "unverified"),
+            "source_ids": valid_ids,
+        })
+    if not citations and sources:
+        citations.append({
+            "key": f"doc:{article.id}#/content/data",
+            "document_id": article.id,
+            "path": "/content/data",
+            "level": "sourced",
+            "source_ids": sorted(source_ids),
+        })
+
+    document = {
+        "id": article.id,
+        "title": article.title,
+        "category": article.category,
+        "type": canonical["content"]["type"],
+        "tags": list(article.tags),
+        "confidence": article.confidence,
+        "version": article.version,
+        "modified_at": canonical["metadata"]["modified_at"],
+        "verification_status": "pending" if is_unverified_draft(article) else "active",
+        "content": compact_content,
+        "sources": sources,
+        "citations": [item["key"] for item in citations],
+    }
+    if score is not None:
+        document["score"] = score
+    if selection_reason:
+        document["selection_reason"] = selection_reason
+    return document, citations
+
+
+def project_fields(document: dict[str, Any], fields: str | None) -> dict[str, Any]:
+    if not fields:
+        return document
+    requested = [item.strip() for item in fields.split(",") if item.strip()]
+    result: dict[str, Any] = {}
+    for dotted in requested:
+        source: Any = document
+        parts = dotted.split(".")
+        try:
+            for part in parts:
+                source = source[part]
+        except (KeyError, TypeError):
+            raise ProtocolFailure("unknown_field", f"Unknown field projection: {dotted}")
+        target = result
+        for part in parts[:-1]:
+            target = target.setdefault(part, {})
+        target[parts[-1]] = copy.deepcopy(source)
+    return result
+
+
+def build_context(index, query: str, *, max_tokens: int = DEFAULT_CONTEXT_TOKENS,
+                  limit: int = 8, category: str | None = None,
+                  tags: list[str] | None = None,
+                  include_unverified: bool = False) -> dict[str, Any]:
+    from ai_wiki.storage import load_article
+
+    if not MIN_CONTEXT_TOKENS <= max_tokens <= MAX_CONTEXT_TOKENS:
+        raise ProtocolFailure(
+            "invalid_token_budget",
+            f"max_tokens must be between {MIN_CONTEXT_TOKENS} and {MAX_CONTEXT_TOKENS}",
+        )
+    if not 1 <= limit <= 50:
+        raise ProtocolFailure("invalid_limit", "limit must be between 1 and 50")
+
+    ranked = index.search(query, category=category, tags=tags, limit=20)
+    candidates: list[tuple[Article, float, str]] = []
+    seen: set[str] = set()
+    for result in ranked:
+        article = load_article(result["id"])
+        if not article or article.id in seen:
+            continue
+        seen.add(article.id)
+        candidates.append((article, float(result.get("hybrid_score", 0.0)), "hybrid"))
+
+    for article, score, _ in list(candidates[:5]):
+        for relation_id in article.related:
+            if relation_id in seen:
+                continue
+            related = load_article(relation_id)
+            if related:
+                seen.add(related.id)
+                candidates.append((related, score * 0.5, f"related:{article.id}"))
+
+    context_id = uuid.uuid4().hex
+    documents: list[dict[str, Any]] = []
+    citations: list[dict[str, Any]] = []
+    excluded_unverified = 0
+    truncated = False
+    for article, score, reason in candidates:
+        if len(documents) >= limit:
+            truncated = True
+            break
+        if is_unverified_draft(article) and not include_unverified:
+            excluded_unverified += 1
+            continue
+        document, document_citations = compact_document(
+            article, score=round(score, 6), selection_reason=reason,
+        )
+        trial_data = {
+            "context_id": context_id,
+            "query": query,
+            "documents": documents + [document],
+            "citations": citations + document_citations,
+        }
+        trial = success(trial_data, meta={
+            "budget": {"max_tokens": max_tokens, "estimated_tokens": 0, "truncated": False},
+            "excluded_unverified": excluded_unverified,
+        })
+        if estimate_tokens(trial) > max_tokens:
+            truncated = True
+            continue
+        documents.append(document)
+        citations.extend(document_citations)
+
+    data = {"context_id": context_id, "query": query, "documents": documents, "citations": citations}
+    meta = {
+        "budget": {"max_tokens": max_tokens, "estimated_tokens": 0, "truncated": truncated},
+        "excluded_unverified": excluded_unverified,
+        "candidate_count": len(candidates),
+    }
+    envelope = success(data, meta=meta)
+    while True:
+        for _ in range(5):
+            estimated = estimate_tokens(envelope)
+            if envelope["meta"]["budget"]["estimated_tokens"] == estimated:
+                break
+            envelope["meta"]["budget"]["estimated_tokens"] = estimated
+        actual = estimate_tokens(envelope)
+        envelope["meta"]["budget"]["estimated_tokens"] = actual
+        if actual <= max_tokens or not documents:
+            break
+        removed = documents.pop()
+        allowed = set(removed["citations"])
+        citations[:] = [item for item in citations if item["key"] not in allowed]
+        envelope["meta"]["budget"]["truncated"] = True
+    index.record_context(
+        context_id=context_id,
+        query=query,
+        document_ids=[item["id"] for item in documents],
+        citations=[item["key"] for item in citations],
+        max_tokens=max_tokens,
+        estimated_tokens=envelope["meta"]["budget"]["estimated_tokens"],
+    )
+    return envelope
+
+
+def _decode_pointer(path: str) -> list[str]:
+    if path == "":
+        return []
+    if not path.startswith("/"):
+        raise ProtocolFailure("invalid_patch", f"JSON Pointer must start with '/': {path}")
+    return [part.replace("~1", "/").replace("~0", "~") for part in path[1:].split("/")]
+
+
+def _parent_for(document: Any, path: str) -> tuple[Any, str]:
+    parts = _decode_pointer(path)
+    if not parts:
+        raise ProtocolFailure("invalid_patch", "Replacing the document root is not allowed")
+    current = document
+    for part in parts[:-1]:
+        try:
+            current = current[int(part)] if isinstance(current, list) else current[part]
+        except (KeyError, IndexError, ValueError, TypeError):
+            raise ProtocolFailure("invalid_patch", f"Path does not exist: {path}")
+    return current, parts[-1]
+
+
+def _get_pointer(document: Any, path: str) -> Any:
+    current = document
+    for part in _decode_pointer(path):
+        try:
+            current = current[int(part)] if isinstance(current, list) else current[part]
+        except (KeyError, IndexError, ValueError, TypeError):
+            raise ProtocolFailure("patch_test_failed", f"Path does not exist: {path}")
+    return current
+
+
+def apply_json_patch(document: dict[str, Any], operations: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str]]:
+    if not isinstance(operations, list) or not operations:
+        raise ProtocolFailure("invalid_patch", "Patch must be a non-empty JSON array")
+    result = copy.deepcopy(document)
+    changed: list[str] = []
+    for position, operation in enumerate(operations):
+        if not isinstance(operation, dict):
+            raise ProtocolFailure("invalid_patch", f"Operation {position} must be an object")
+        op = operation.get("op")
+        path = operation.get("path")
+        if op not in {"test", "add", "replace", "remove"} or not isinstance(path, str):
+            raise ProtocolFailure("invalid_patch", f"Unsupported operation at index {position}")
+        if op != "test" and any(
+            path == protected or path.startswith(protected + "/") or protected.startswith(path + "/")
+            for protected in PROTECTED_PATCH_PATHS
+        ):
+            raise ProtocolFailure("protected_field", f"Field cannot be patched: {path}")
+        if op == "test":
+            if "value" not in operation or _get_pointer(result, path) != operation["value"]:
+                raise ProtocolFailure("patch_test_failed", f"Test operation failed: {path}")
+            continue
+        parent, key = _parent_for(result, path)
+        if op == "remove":
+            try:
+                parent.pop(int(key)) if isinstance(parent, list) else parent.pop(key)
+            except (KeyError, IndexError, ValueError, TypeError):
+                raise ProtocolFailure("invalid_patch", f"Cannot remove missing path: {path}")
+        elif isinstance(parent, list):
+            if "value" not in operation:
+                raise ProtocolFailure("invalid_patch", f"Operation requires value: {path}")
+            if op == "add" and key == "-":
+                parent.append(copy.deepcopy(operation["value"]))
+            else:
+                try:
+                    index = int(key)
+                    if op == "add":
+                        parent.insert(index, copy.deepcopy(operation["value"]))
+                    else:
+                        parent[index] = copy.deepcopy(operation["value"])
+                except (IndexError, ValueError):
+                    raise ProtocolFailure("invalid_patch", f"Invalid array path: {path}")
+        else:
+            if "value" not in operation:
+                raise ProtocolFailure("invalid_patch", f"Operation requires value: {path}")
+            if op == "replace" and key not in parent:
+                raise ProtocolFailure("invalid_patch", f"Cannot replace missing path: {path}")
+            parent[key] = copy.deepcopy(operation["value"])
+        changed.append(path)
+    return result, changed
+
+
+def load_json_input(path: str) -> Any:
+    import sys
+    raw = sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ProtocolFailure("invalid_json", f"Invalid JSON: {exc.msg}") from exc
+
+
+def utc_now_text() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

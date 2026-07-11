@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 - 2026-07-12
+
+- Add a stable AI JSON protocol with compact, full, and raw document views.
+- Add token-budgeted hybrid context assembly with path-level citations and usage tracking.
+- Add optimistic, validated RFC 6902 patching and autonomous JSON document creation.
+- Exclude pending unverified drafts from normal context while preserving them for verification.
+- Replace agent skill workflows with context-first retrieval and evidence-linked writeback.
+- Add deterministic protocol benchmarks and live Codex, Claude, and Gemini acceptance evaluation.
+
 ## 0.3.0 - 2026-07-11
 
 - Add canonical `schema_version: 2` documents with strict Pydantic validation and JSON Schema output.

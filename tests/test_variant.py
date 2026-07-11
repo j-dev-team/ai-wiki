@@ -73,7 +73,7 @@ def test_variant_create_generates_independent_package(tmp_path):
     assert 'name = "law-wiki"' in pyproject
     assert 'law-wiki = "law_wiki.cli:cli"' in pyproject
     assert 'law-wiki-web = "law_wiki.web:main"' in pyproject
-    assert 'dependencies = ["ai-wiki>=0.3,<0.4"]' in pyproject
+    assert 'dependencies = ["ai-wiki>=0.4,<0.5"]' in pyproject
     assert '"variant.yaml"' in pyproject
 
     cli_text = (package_dir / "src" / "law_wiki" / "cli.py").read_text(encoding="utf-8")
@@ -86,7 +86,7 @@ def test_variant_create_generates_independent_package(tmp_path):
 
     skill_text = (package_dir / "src" / "law_wiki" / "skill_templates" / "SKILL.md").read_text(encoding="utf-8")
     assert "name: law-wiki" in skill_text
-    assert "law-wiki search" in skill_text
+    assert "law-wiki context" in skill_text
     assert "contracts, litigation" in skill_text
     assert (package_dir / "src" / "law_wiki" / "variant.yaml").exists()
 

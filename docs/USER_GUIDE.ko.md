@@ -1,4 +1,4 @@
-# AI Wiki 0.3 사용자 설명서
+# AI Wiki 0.4 사용자 설명서
 
 이 문서는 Windows에서 AI Wiki를 설치하고 일반 위키와 목적별 위키를 운영하는 전체 절차를 설명합니다. AI Wiki는 인증과 권한 관리가 없는 로컬 전용 프로그램입니다. 웹 서버를 인터넷에 공개하지 말고, 고객 정보나 민감정보가 있는 위키는 사용자 계정과 디스크 접근 권한도 함께 보호하세요.
 
@@ -36,15 +36,13 @@ ai-wiki --help
 python -m pip install --upgrade ai-wiki
 ai-wiki upgrade-skill
 ai-wiki migrate-schema
-ai-wiki migrate-schema --apply
 ai-wiki vindex
 ai-wiki doctor
 ```
 
-`migrate-schema`는 먼저 검사만 수행합니다. 오류가 없음을 확인한 뒤 `--apply`를
-사용하면 기존 YAML을 `backups/`에 보관하고 스키마 v2로 원자적으로 교체한 후
-검색 인덱스를 다시 만듭니다. 원본 없이 변환하려면 `--no-backup`을 추가할 수
-있지만 권장하지 않습니다.
+`migrate-schema`는 검사만 수행합니다. v0.4는 기존 v1 문서를 읽을 때 내부에서
+정규화하고 실제로 수정된 문서만 v2로 저장하므로 일괄 `--apply`는 필요하지
+않습니다. 사용자가 명시적으로 일괄 변환을 결정한 경우에만 백업 후 실행합니다.
 
 정상 결과의 기준은 다음과 같습니다.
 
@@ -63,6 +61,27 @@ ai-wiki variant upgrade D:\dev\tax-wiki
 각 `variant upgrade`는 먼저 백업을 만들고, 검증에 실패하면 이전 상태로 되돌립니다.
 
 ## 3. 일반 AI Wiki 시작하기
+
+### AI 에이전트 기본 흐름
+
+AI 에이전트는 다음 순서로 지식을 검색하고 활용합니다.
+
+```powershell
+ai-wiki capabilities
+ai-wiki context "질문" --max-tokens 4000
+ai-wiki get <문서-ID>
+ai-wiki record-use <context-id> --citation "doc:<ID>#<경로>" --outcome answered
+```
+
+컨텍스트가 부족하면 외부 조사 후 전체 문서를 덮어쓰지 않고 patch합니다.
+
+```powershell
+ai-wiki patch <문서-ID> --operations-file patch.json --if-version 2 --dry-run
+ai-wiki patch <문서-ID> --operations-file patch.json --if-version 2
+```
+
+출처 없는 지식은 confidence 0.5 이하의 검증 대기 초안으로 저장되며 일반
+context에서는 제외됩니다.
 
 ### 위키 만들기
 
