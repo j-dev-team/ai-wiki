@@ -141,8 +141,8 @@ def validate(article: Article) -> QualityReport:
 
     # ── ERROR: 검증률 ──
 
-    v_rate = _calc_verification_rate(content)
-    v_total = _count_v_fields(content)
+    v_rate = _calc_verification_rate(content, article.verification)
+    v_total = _count_v_fields(content, article.verification)
     if v_total == 0:
         report.violations.append(QualityViolation(
             "error", "NO_VERIFICATION",
@@ -221,7 +221,7 @@ def calculate_score(article: Article) -> float:
     conf_score = article.confidence * 0.10
 
     # 검증률 점수 (30%) — _v 필드 중 verified/corroborated 비율
-    verification_score = _calc_verification_rate(content) * 0.30
+    verification_score = _calc_verification_rate(content, article.verification) * 0.30
 
     return round(key_score + word_score + source_score + tag_score +
                  ref_score + conf_score + verification_score, 3)
@@ -244,7 +244,7 @@ def _count_words(text: str) -> int:
     return en + ko
 
 
-def _count_v_fields(content: dict) -> int:
+def _count_v_fields(content: dict, verification: list[dict] | None = None) -> int:
     """content 내 _v 필드 총 개수."""
     count = 0
     def scan(d):
@@ -259,12 +259,15 @@ def _count_v_fields(content: dict) -> int:
             for item in d:
                 scan(item)
     scan(content)
-    return count
+    return count + len(verification or [])
 
 
-def _calc_verification_rate(content: dict) -> float:
+def _calc_verification_rate(content: dict, verification: list[dict] | None = None) -> float:
     """content 내 _v 필드의 V_LEVEL_WEIGHTS 평균. _v 없으면 0.5 (중립)."""
     from ai_wiki.quality import V_LEVEL_WEIGHTS as _VW
+    if verification:
+        weights = [_VW.get(item.get("level", "unverified"), 0.0) for item in verification]
+        return sum(weights) / len(weights)
     if not isinstance(content, dict):
         return 0.5
 

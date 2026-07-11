@@ -1,4 +1,4 @@
-# AI Wiki 0.2 사용자 설명서
+# AI Wiki 0.3 사용자 설명서
 
 이 문서는 Windows에서 AI Wiki를 설치하고 일반 위키와 목적별 위키를 운영하는 전체 절차를 설명합니다. AI Wiki는 인증과 권한 관리가 없는 로컬 전용 프로그램입니다. 웹 서버를 인터넷에 공개하지 말고, 고객 정보나 민감정보가 있는 위키는 사용자 계정과 디스크 접근 권한도 함께 보호하세요.
 
@@ -35,9 +35,16 @@ ai-wiki --help
 ```powershell
 python -m pip install --upgrade ai-wiki
 ai-wiki upgrade-skill
+ai-wiki migrate-schema
+ai-wiki migrate-schema --apply
 ai-wiki vindex
 ai-wiki doctor
 ```
+
+`migrate-schema`는 먼저 검사만 수행합니다. 오류가 없음을 확인한 뒤 `--apply`를
+사용하면 기존 YAML을 `backups/`에 보관하고 스키마 v2로 원자적으로 교체한 후
+검색 인덱스를 다시 만듭니다. 원본 없이 변환하려면 `--no-backup`을 추가할 수
+있지만 권장하지 않습니다.
 
 정상 결과의 기준은 다음과 같습니다.
 
@@ -116,6 +123,14 @@ _v:
   sources:
     - https://docs.pytest.org/
   note: 공식 문서를 기준으로 확인
+```
+
+작성용 `content.yaml`에서는 위와 같은 간단한 `_v` 표기를 계속 사용할 수
+있습니다. 저장할 때는 본문에서 제거되고 v2 문서의 최상위 `verification` 목록과
+`source_ids` 참조로 정규화됩니다. 전체 스키마는 다음 명령으로 확인합니다.
+
+```powershell
+ai-wiki schema-json
 ```
 
 문서를 생성합니다.

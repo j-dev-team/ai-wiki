@@ -399,7 +399,7 @@ def _find_installed_command(command_name: str, python_executable: str | None = N
 def _write_variant_module(target_dir: Path, spec: VariantSpec) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
     runtime_spec = repr(spec.as_dict())
-    (target_dir / "__init__.py").write_text('__version__ = "0.2.1"\n', encoding="utf-8")
+    (target_dir / "__init__.py").write_text('__version__ = "0.3.0"\n', encoding="utf-8")
     (target_dir / "cli.py").write_text(
         "from pathlib import Path\n\n"
         "from ai_wiki.runtime import activate_variant\n\n"
@@ -435,12 +435,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "{spec.package_name}"
-version = "0.2.1"
+version = "0.3.0"
 description = "{_toml_string(spec.description)}"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-dependencies = ["ai-wiki>=0.2,<0.3"]
+dependencies = ["ai-wiki>=0.3,<0.4"]
 
 [project.scripts]
 {spec.command_name} = "{spec.module_name}.cli:cli"

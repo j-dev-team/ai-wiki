@@ -19,6 +19,7 @@ class WikiIndex:
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA journal_mode = WAL")
         self.initialize()
+        self._reconcile_pending_updates()
 
     def initialize(self) -> None:
         cur = self.conn.cursor()
@@ -82,6 +83,27 @@ class WikiIndex:
             except sqlite3.OperationalError:
                 pass
         self.conn.commit()
+
+    def _reconcile_pending_updates(self) -> None:
+        """Recover YAML-to-index updates interrupted between file and DB commits."""
+        import json
+        from ai_wiki.storage import _load_yaml_file, get_relative_path, get_wiki_root
+
+        pending_dir = self.db_path.parent / "pending-index"
+        if not pending_dir.exists():
+            return
+        root = get_wiki_root().resolve()
+        for marker in pending_dir.glob("*.json"):
+            try:
+                payload = json.loads(marker.read_text(encoding="utf-8"))
+                path = (root / payload["file_path"]).resolve()
+                path.relative_to(root)
+                data = _load_yaml_file(path) if path.exists() else None
+                if data and data.get("id") == payload.get("article_id"):
+                    self.upsert(Article.from_yaml(data), get_relative_path(path))
+                marker.unlink(missing_ok=True)
+            except Exception:
+                self.conn.rollback()
 
     def upsert(self, article: Article, file_path: str = "") -> None:
         cur = self.conn.cursor()

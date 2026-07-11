@@ -73,7 +73,7 @@ def test_variant_create_generates_independent_package(tmp_path):
     assert 'name = "law-wiki"' in pyproject
     assert 'law-wiki = "law_wiki.cli:cli"' in pyproject
     assert 'law-wiki-web = "law_wiki.web:main"' in pyproject
-    assert 'dependencies = ["ai-wiki>=0.2,<0.3"]' in pyproject
+    assert 'dependencies = ["ai-wiki>=0.3,<0.4"]' in pyproject
     assert '"variant.yaml"' in pyproject
 
     cli_text = (package_dir / "src" / "law_wiki" / "cli.py").read_text(encoding="utf-8")

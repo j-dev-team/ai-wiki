@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Any
+
+from ai_wiki.schema_v2 import SCHEMA_VERSION, validate_v2_document
 
 # content 내부에서 검색/인덱싱에서 제외할 예약 키
 _RESERVED_KEYS = {"_meta", "_changelog", "_v"}
@@ -27,11 +30,21 @@ class Article:
     sources: list[str] = field(default_factory=list)
     related: list[str] = field(default_factory=list)
     author: str = "unknown"
+    schema_version: int = SCHEMA_VERSION
+    metadata: dict[str, Any] = field(default_factory=dict)
+    source_records: list[dict[str, Any]] = field(default_factory=list)
+    relations: list[dict[str, Any]] = field(default_factory=list)
+    verification: list[dict[str, Any]] = field(default_factory=list)
+    history: list[dict[str, Any]] = field(default_factory=list)
+    extensions: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
-        """전체 데이터를 dict로 변환 (JSON/YAML 직렬화용)."""
+        """Return the backward-compatible API representation."""
         meta = self.meta_dict()
-        meta["content"] = self.content
+        content = dict(self.content) if isinstance(self.content, dict) else self.content
+        if isinstance(content, dict) and self.metadata:
+            content["_meta"] = dict(self.metadata)
+        meta["content"] = content
         return meta
 
     def meta_dict(self) -> dict:
@@ -52,10 +65,73 @@ class Article:
         }
 
     def to_yaml_dict(self) -> dict:
-        """YAML 파일 저장용."""
-        d = self.meta_dict()
-        d["content"] = self.content
-        return d
+        """Return the canonical schema-v2 YAML mapping."""
+        from ai_wiki.schemas import compute_completeness, determine_maturity
+
+        if not isinstance(self.content, dict):
+            raise ValueError("content must be a mapping")
+        existing_sources = {item.get("url"): item for item in self.source_records}
+        source_records = []
+        used_source_ids: set[str] = set()
+        for index, url in enumerate(self.sources, start=1):
+            record = dict(existing_sources.get(url, {}))
+            source_id = record.get("id") or f"src-{index}"
+            while source_id in used_source_ids:
+                source_id = f"src-{index}-{len(used_source_ids) + 1}"
+            record.update({"id": source_id, "url": url})
+            used_source_ids.add(source_id)
+            source_records.append(record)
+        existing_relations = {item.get("target_id"): item for item in self.relations}
+        relations = [
+            dict(existing_relations.get(target, {}), target_id=target)
+            for target in self.related
+        ]
+        from ai_wiki.migration import normalize_legacy_content
+        content, legacy_verification, legacy_meta, legacy_history = normalize_legacy_content(
+            self.content, source_records
+        )
+        content_type = content.pop("type", "")
+        completeness, _, _ = compute_completeness(self.content)
+        metadata = {
+            "confidence": self.confidence,
+            "document_version": self.version,
+            "created_at": self._fmt(self.created_at),
+            "modified_at": self._fmt(self.last_modified),
+            "verified_at": self._fmt(self.last_verified),
+            "author": self.author,
+            "maturity": self.metadata.get(
+                "maturity",
+                legacy_meta.get(
+                    "maturity",
+                    determine_maturity(completeness, len(source_records), len(relations), self.confidence),
+                ),
+            ),
+            "completeness": self.metadata.get(
+                "completeness", legacy_meta.get("completeness", completeness)
+            ),
+        }
+        extensions = dict(self.extensions)
+        extra_metadata = {
+            key: value for key, value in {**legacy_meta, **self.metadata}.items()
+            if key not in {"maturity", "completeness"}
+        }
+        if extra_metadata:
+            extensions["system_metadata"] = extra_metadata
+        document = {
+            "schema_version": SCHEMA_VERSION,
+            "id": self.id,
+            "title": self.title,
+            "category": self.category,
+            "tags": self.tags,
+            "metadata": metadata,
+            "sources": source_records,
+            "relations": relations,
+            "content": {"type": content_type, "data": content},
+            "verification": self.verification or legacy_verification,
+            "history": self.history or legacy_history,
+            "extensions": extensions,
+        }
+        return validate_v2_document(document).model_dump(mode="json", exclude_none=True)
 
     def content_as_text(self) -> str:
         """content dict를 평탄화하여 검색용 텍스트로 변환. 예약키 제외.
@@ -73,30 +149,30 @@ class Article:
     # ── _meta 헬퍼 ────────────────────────────────
 
     def get_meta(self) -> dict:
-        """content._meta를 반환. 없으면 빈 dict."""
-        if isinstance(self.content, dict):
-            return self.content.get("_meta", {})
-        return {}
+        """Return normalized system metadata."""
+        return self.metadata
 
     def set_meta(self, meta: dict) -> None:
-        """content._meta를 설정."""
-        if isinstance(self.content, dict):
-            self.content["_meta"] = meta
+        """Set normalized system metadata."""
+        self.metadata = dict(meta)
 
     # ── _changelog 헬퍼 ──────────────────────────
 
     def append_changelog(self, action: str, fields: list[str], note: str = "") -> None:
-        """content._changelog에 항목 추가."""
-        if not isinstance(self.content, dict):
-            return
-        if "_changelog" not in self.content:
-            self.content["_changelog"] = []
-        self.content["_changelog"].append({
-            "date": self._fmt(_now()),
+        """Append an entry to normalized document history."""
+        entry = {
+            "at": self._fmt(_now()),
             "action": action,
             "fields": fields,
             "note": note,
-        })
+        }
+        self.history.append(entry)
+        # Keep the legacy in-memory view for API compatibility. YAML serialization
+        # removes this key and persists only the normalized history record above.
+        if isinstance(self.content, dict):
+            self.content.setdefault("_changelog", []).append({
+                "date": entry["at"], "action": action, "fields": fields, "note": note,
+            })
 
     # ── static/class methods ─────────────────────
 
@@ -112,6 +188,8 @@ class Article:
             if value.tzinfo is None:
                 return value.replace(tzinfo=timezone.utc)
             return value
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("datetime value is required")
         for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d"):
             try:
                 dt = datetime.strptime(value, fmt)
@@ -120,11 +198,16 @@ class Article:
                 return dt
             except ValueError:
                 continue
-        return _now()
+        raise ValueError(f"invalid datetime: {value!r}")
 
     @classmethod
     def from_yaml(cls, data: dict) -> Article:
         """YAML dict에서 Article 생성."""
+        if data.get("schema_version") == SCHEMA_VERSION:
+            from ai_wiki.migration import v2_to_article_fields
+            return cls(**v2_to_article_fields(data))
+        if "schema_version" in data:
+            raise ValueError(f"unsupported schema_version: {data['schema_version']}")
         tags = data.get("tags", [])
         if isinstance(tags, str):
             tags = [t.strip() for t in tags.split(",") if t.strip()]
@@ -141,6 +224,7 @@ class Article:
         if isinstance(content, str):
             content = {"text": content}
 
+        now = _now()
         return cls(
             id=data.get("id", ""),
             title=data.get("title", ""),
@@ -149,9 +233,9 @@ class Article:
             tags=tags,
             confidence=float(data.get("confidence", 0.8)),
             version=int(data.get("version", 1)),
-            created_at=cls._parse_dt(data.get("created_at", "")),
-            last_modified=cls._parse_dt(data.get("last_modified", "")),
-            last_verified=cls._parse_dt(data.get("last_verified", "")),
+            created_at=cls._parse_dt(data["created_at"]) if data.get("created_at") else now,
+            last_modified=cls._parse_dt(data["last_modified"]) if data.get("last_modified") else now,
+            last_verified=cls._parse_dt(data["last_verified"]) if data.get("last_verified") else now,
             sources=sources,
             related=related,
             author=data.get("author", "unknown"),

@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+import json
 import os
 import shutil
 import sqlite3
 import subprocess
+import tempfile
 from pathlib import Path
 
 import yaml
 
 from ai_wiki.models import Article
+from ai_wiki.yaml_loader import load_yaml_file as strict_load_yaml_file
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +63,11 @@ def _lookup_file_path(article_id: str) -> Path | None:
 def _load_yaml_file(yaml_file: Path) -> dict | None:
     """YAML 파일 로드. #3: 예외를 구분하여 로깅."""
     try:
-        with open(yaml_file, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
-    except yaml.YAMLError as e:
+        data = strict_load_yaml_file(yaml_file)
+        if data is not None and not isinstance(data, dict):
+            raise ValueError("document root must be a mapping")
+        return data
+    except (yaml.YAMLError, ValueError) as e:
         logger.warning("YAML 파싱 오류: %s: %s", yaml_file, e)
     except (OSError, UnicodeDecodeError) as e:
         logger.error("파일 읽기 오류: %s: %s", yaml_file, e)
@@ -73,7 +79,7 @@ def _load_yaml_file(yaml_file: Path) -> dict | None:
 # ── CRUD ──────────────────────────────────────────
 
 def save_article(article: Article) -> Path:
-    """Article을 YAML 파일로 저장."""
+    """Validate and atomically save an Article as canonical schema v2 YAML."""
     # category path traversal 방지
     if ".." in article.category:
         raise ValueError(f"category에 '..'을 포함할 수 없습니다: {article.category}")
@@ -91,10 +97,37 @@ def save_article(article: Article) -> Path:
     file_path = category_dir / f"{slug_part}.yaml"
 
     data = article.to_yaml_dict()
-    with open(file_path, "w", encoding="utf-8") as f:
-        yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+    serialized = yaml.safe_dump(
+        data, allow_unicode=True, default_flow_style=False, sort_keys=False,
+    )
+    _atomic_write_bytes(file_path, serialized.encode("utf-8"))
 
     return file_path
+
+
+def _atomic_write_bytes(path: Path, data: bytes) -> None:
+    """Durably replace one file using a temporary file in the same directory."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    temp_path = Path(temp_name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        # Verify the exact bytes are readable before replacing the destination.
+        if temp_path.read_bytes() != data:
+            raise OSError(f"temporary file verification failed: {temp_path}")
+        os.replace(temp_path, path)
+        if os.name != "nt":
+            directory_fd = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
 
 
 def load_article(article_id: str) -> Article | None:
@@ -258,14 +291,23 @@ def delete_source_files(article_id: str) -> bool:
 
 def atomic_save(article: Article, index) -> Path:
     """파일 저장 + DB upsert를 원자적으로 수행. 실패 시 롤백."""
+    file_path = _article_file_path(article)
+    previous = file_path.read_bytes() if file_path.exists() else None
+    pending = _mark_index_pending(article, file_path)
     file_path = save_article(article)
     rel_path = get_relative_path(file_path)
     try:
         index.upsert(article, rel_path)
     except Exception:
-        if file_path.exists():
-            file_path.unlink()
+        if hasattr(index, "conn"):
+            index.conn.rollback()
+        if previous is None:
+            file_path.unlink(missing_ok=True)
+        else:
+            _atomic_write_bytes(file_path, previous)
+        pending.unlink(missing_ok=True)
         raise
+    pending.unlink(missing_ok=True)
     return file_path
 
 
@@ -295,20 +337,55 @@ def git_auto_commit(action: str, article_id: str = "", title: str = "") -> bool:
 
 
 def atomic_update(article: Article, old_path: Path | None, index) -> Path:
-    """기존 파일 백업 후 새 파일+DB 저장. 실패 시 원복."""
-    backup_data = None
-    if old_path and old_path.exists():
-        backup_data = old_path.read_bytes()
-        old_path.unlink()
-
+    """Atomically replace YAML, then reconcile the derived SQLite index."""
+    file_path = _article_file_path(article)
+    target_backup = file_path.read_bytes() if file_path.exists() else None
+    old_backup = old_path.read_bytes() if old_path and old_path.exists() else None
+    pending = _mark_index_pending(article, file_path)
     file_path = save_article(article)
     rel_path = get_relative_path(file_path)
     try:
         index.upsert(article, rel_path)
     except Exception:
-        if file_path.exists():
-            file_path.unlink()
-        if backup_data and old_path:
-            old_path.write_bytes(backup_data)
+        if hasattr(index, "conn"):
+            index.conn.rollback()
+        if target_backup is None:
+            file_path.unlink(missing_ok=True)
+        else:
+            _atomic_write_bytes(file_path, target_backup)
+        if old_path and old_backup is not None and old_path != file_path:
+            _atomic_write_bytes(old_path, old_backup)
+        pending.unlink(missing_ok=True)
         raise
+    if old_path and old_path != file_path:
+        old_path.unlink(missing_ok=True)
+    pending.unlink(missing_ok=True)
     return file_path
+
+
+def _article_file_path(article: Article) -> Path:
+    """Resolve an article path without touching the filesystem."""
+    articles_dir = get_articles_dir()
+    if ".." in article.category or Path(article.category).is_absolute():
+        raise ValueError(f"invalid article category: {article.category}")
+    category_dir = (articles_dir / article.category).resolve()
+    try:
+        category_dir.relative_to(articles_dir.resolve())
+    except ValueError as exc:
+        raise ValueError(f"category escapes articles directory: {article.category}") from exc
+    slug_part = article.id.split("-", 1)[1] if "-" in article.id else article.id
+    return category_dir / f"{slug_part}.yaml"
+
+
+def _mark_index_pending(article: Article, file_path: Path) -> Path:
+    """Persist a recovery marker before changing YAML and its derived index."""
+    pending_dir = get_data_dir() / "pending-index"
+    pending_dir.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256(article.id.encode("utf-8")).hexdigest()
+    marker = pending_dir / f"{digest}.json"
+    payload = json.dumps({
+        "article_id": article.id,
+        "file_path": get_relative_path(file_path),
+    }, ensure_ascii=False).encode("utf-8")
+    _atomic_write_bytes(marker, payload)
+    return marker

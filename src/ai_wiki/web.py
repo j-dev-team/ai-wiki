@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
+from ai_wiki.yaml_loader import load_yaml_text
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 
 from ai_wiki.index import WikiIndex
@@ -197,7 +198,7 @@ def create_article():
             return render_template("edit.html", mode="create", article=None, form=request.form)
 
         try:
-            content = yaml.safe_load(content_yaml)
+            content = load_yaml_text(content_yaml)
             if not isinstance(content, dict):
                 content = {"text": content_yaml}
         except yaml.YAMLError:
@@ -242,7 +243,7 @@ def edit_article(article_id: str):
 
         content_yaml = request.form.get("content", "").strip()
         try:
-            content = yaml.safe_load(content_yaml)
+            content = load_yaml_text(content_yaml)
             if not isinstance(content, dict):
                 content = {"text": content_yaml}
         except yaml.YAMLError:

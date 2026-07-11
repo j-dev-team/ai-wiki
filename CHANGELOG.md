@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 - 2026-07-11
+
+- Add canonical `schema_version: 2` documents with strict Pydantic validation and JSON Schema output.
+- Normalize sources, relations, verification, history, and system metadata outside user content.
+- Add duplicate-key and resource-bounded YAML loading.
+- Add idempotent `migrate-schema` dry-run/apply workflow with backups and reports.
+- Replace direct YAML writes with same-directory temporary files, `fsync`, and `os.replace`.
+- Keep v1 documents and legacy API metadata readable during the compatibility window.
+
 ## 0.2.1 - 2026-07-11
 
 - Added manifest-driven purpose-specific wiki presets and thin shared-engine packages.

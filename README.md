@@ -290,42 +290,63 @@ ai-wiki vsearch "machine learning python"
 ## Document Structure (YAML Schema)
 
 ```yaml
+schema_version: 2
 id: tech-python-abc123
 title: Python Basics
 category: technology/programming
-tags:
-  - python
-  - programming
-confidence: 0.9
-version: 1
-created_at: 2026-01-01T00:00:00Z
-last_modified: 2026-01-01T00:00:00Z
-last_verified: 2026-01-01T00:00:00Z
+tags: [python, programming]
+metadata:
+  confidence: 0.9
+  document_version: 1
+  created_at: 2026-01-01T00:00:00Z
+  modified_at: 2026-01-01T00:00:00Z
+  verified_at: 2026-01-01T00:00:00Z
+  author: ai-agent
+  maturity: mature
+  completeness: 0.85
 sources:
-  - https://docs.python.org
-related:
-  - tech-django-xyz789
-author: claude
+  - id: src-1
+    url: https://docs.python.org/3/
+    title: Python documentation
+    retrieved_at: 2026-01-01T00:00:00Z
+relations:
+  - target_id: tech-django-xyz789
+    type: related_to
+    direction: outgoing
+    weight: 0.8
+    source_ids: [src-1]
 content:
-  type: knowledge
-  what: Python is a general-purpose interpreted programming language
-  creator: Guido van Rossum
-  release_year:
-    value: 1991
-    _v:
-      level: verified       # unverified | sourced | verified | corroborated | human_verified | disputed
-      source: https://docs.python.org
-  use_cases:
-    - web development
-    - data science
-  _meta:
-    maturity: mature        # stub | draft | review | mature
-    completeness: 0.85
-  _changelog:
-    - date: 2026-01-01T00:00:00Z
-      action: created
-      fields: [what, creator]
-      note: Document created
+  type: technology
+  data:
+    what: Python is a general-purpose interpreted programming language
+    facts:
+      - Python was created by Guido van Rossum.
+      - Python was first released in 1991.
+    use_cases: [web development, data science]
+verification:
+  - path: /content/data/facts/1
+    level: verified
+    source_ids: [src-1]
+    verified_at: 2026-01-01T00:00:00Z
+history:
+  - at: 2026-01-01T00:00:00Z
+    action: created
+    fields: [what, facts]
+    note: Document created
+extensions: {}
+```
+
+Schema v2 validates field types, date/time zones, HTTP(S) source URLs, content
+types, required content fields, relation weights, and source references. Unknown
+top-level fields are rejected. Custom content types must be registered in
+`.ai-wiki.yaml` before use.
+
+Existing v1 documents remain readable. Migrate them explicitly after upgrading:
+
+```bash
+ai-wiki migrate-schema            # dry-run and validation report
+ai-wiki migrate-schema --apply    # backup, atomic conversion, index rebuild
+ai-wiki schema-json > schema.json # integration JSON Schema
 ```
 
 ### File Storage Path
@@ -340,9 +361,9 @@ Example: `articles/technology/programming/python-abc123.yaml`
 
 ## Quality System
 
-### Verification Levels (`_v`)
+### Verification Levels
 
-Track reliability by attaching `_v` metadata to factual data such as numbers, dates, and quotes.
+Schema v2 stores verification records outside user content and targets claims with JSON Pointer paths.
 
 | Level | Weight | Description |
 |-------|--------|-------------|

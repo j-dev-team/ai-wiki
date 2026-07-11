@@ -15,6 +15,9 @@ import click
 import yaml
 
 from ai_wiki.runtime import get_runtime
+from ai_wiki.migration import migrate_article_files
+from ai_wiki.schema_v2 import document_json_schema
+from ai_wiki.yaml_loader import load_yaml_text
 
 _RUNTIME = get_runtime()
 DEFAULT_WIKI_PRESET = _RUNTIME.default_preset
@@ -1187,6 +1190,42 @@ def reindex(ctx):
         "action": "reindexed",
         "article_count": len(items),
     })
+
+
+@cli.command("migrate-schema")
+@click.option("--apply", "apply_changes", is_flag=True,
+              help="Write migrated v2 files; default is dry-run")
+@click.option("--no-backup", is_flag=True,
+              help="Do not retain v1 copies under backups/ (only with --apply)")
+@click.pass_context
+def migrate_schema(ctx, apply_changes, no_backup):
+    """Validate and migrate legacy article YAML files to schema v2."""
+    root = get_wiki_root()
+    report = migrate_article_files(
+        root, dry_run=not apply_changes, backup=not no_backup,
+    )
+    if apply_changes:
+        from ai_wiki.storage import get_articles_dir, _load_yaml_file
+        idx: WikiIndex = ctx.obj["index"]
+        items = []
+        articles_dir = get_articles_dir()
+        for path in articles_dir.rglob("*.yaml") if articles_dir.exists() else []:
+            data = _load_yaml_file(path)
+            if data and "id" in data:
+                items.append((Article.from_yaml(data), get_relative_path(path)))
+        idx.rebuild(items)
+        rebuild_catalog()
+    output_json({
+        "status": "ok" if not report["failed"] else "partial",
+        "action": "schema_migration",
+        **report,
+    })
+
+
+@cli.command("schema-json")
+def schema_json():
+    """Print the canonical schema-v2 JSON Schema."""
+    output_json(document_json_schema())
 
 
 @cli.command()
@@ -2446,7 +2485,7 @@ def _read_yaml_content(content_file: str | None, content_stdin: bool) -> dict | 
         raw = raw.replace("\t", "  ")
 
     try:
-        data = yaml.safe_load(raw)
+        data = load_yaml_text(raw)
         if isinstance(data, dict):
             return data
         return {"text": raw}

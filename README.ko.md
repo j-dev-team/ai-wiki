@@ -4,7 +4,7 @@ AI Wiki는 AI 에이전트가 조사한 지식을 로컬 파일 시스템에 **�
 
 [English README](https://github.com/j-dev-team/ai-wiki/blob/master/README.md)
 
-[AI Wiki 0.2 통합 사용설명서](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md) | [목적별 독립 위키 안내](https://github.com/j-dev-team/ai-wiki/blob/master/docs/VARIANTS.md)
+[AI Wiki 0.3 통합 사용설명서](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md) | [목적별 독립 위키 안내](https://github.com/j-dev-team/ai-wiki/blob/master/docs/VARIANTS.md)
 
 > 보안 안내: AI Wiki는 인증/권한 관리 기능이 없습니다. 로컬 전용 도구로 사용하세요. 웹 UI나 데이터 디렉터리를 외부 네트워크에 노출하지 마세요. 데이터는 로컬 파일에 평문으로 저장됩니다.
 
