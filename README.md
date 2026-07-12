@@ -12,7 +12,7 @@ A CLI-based knowledge wiki system that stores, searches, and manages knowledge l
 
 ## Why AI Wiki?
 
-AI coding agents (Claude Code, Gemini CLI, GPT Codex) have no built-in way to retain and reuse knowledge across sessions or projects — every conversation starts from scratch.
+AI coding agents (Claude Code, Gemini via Antigravity CLI, GPT Codex) have no built-in way to retain and reuse knowledge across sessions or projects — every conversation starts from scratch.
 **AI Wiki is a structured knowledge store that agents read and write directly.** Save a piece of knowledge once, and every agent in every project can access it automatically — no copy-paste, no repeated research.
 
 ---
@@ -31,7 +31,7 @@ AI coding agents (Claude Code, Gemini CLI, GPT Codex) have no built-in way to re
 - **Quality Gates** — 5-level automatic evaluation of confidence, sources, and verification
 - **Auto Cross-Reference** — Automatic detection and bidirectional linking of related documents
 - **Git Auto-Commit** — Automatic Git history recording on every document change
-- **AI Agent Skill Integration** — Auto-generates skill files for Claude Code (`~/.claude/skills/`), Gemini CLI (`~/.agents/skills/`), and GPT Codex (`~/.codex/skills/`)
+- **AI Agent Skill Integration** — Auto-generates skill files for Claude Code (`~/.claude/skills/`), Gemini via Antigravity CLI (`~/.gemini/config/skills/`), and GPT Codex (`~/.codex/skills/`)
 - **Wiki Name Customization** — Name entered during init is displayed in the web UI header
 - **Token Optimization** — Efficient operation with large document sets via DB metadata queries
 - **Purpose-Specific Variants** — Install isolated law, labor, tax, business, research, or custom wikis backed by one shared engine
@@ -119,15 +119,19 @@ See [Purpose-Specific Wikis](https://github.com/j-dev-team/ai-wiki/blob/master/d
 ```
 Which AI agents do you use? (comma-separated numbers)
   1. Claude Code
-  2. Gemini CLI
+  2. Gemini via Antigravity CLI
   3. GPT Codex
 Select [1,2,3] (default: 1):
 ```
 
 - Default: `1` (Claude Code only)
-- Multiple: `1,2` → Claude Code + Gemini CLI
+- Multiple: `1,2` → Claude Code + Gemini via Antigravity CLI
 - All: `1,2,3`
 - Skills are installed only to the selected agent paths (saved in `.ai-wiki.yaml`)
+
+Gemini uses Antigravity CLI (`agy`). Install it on Windows with
+`irm https://antigravity.google/cli/install.ps1 | iex`, then run `agy` once and
+authenticate with the Google account that owns the Gemini subscription.
 
 | Preset | Description |
 |--------|-------------|
@@ -469,7 +473,7 @@ ai-wiki init ~/my-wiki
 
 ```
 ~/.claude/skills/my-wiki/   <- Claude Code
-~/.agents/skills/my-wiki/   <- Gemini CLI
+~/.gemini/config/skills/my-wiki/   <- Gemini via Antigravity CLI
 ~/.codex/skills/my-wiki/    <- GPT Codex
 
 Project A --+
@@ -516,7 +520,7 @@ AI_WIKI_ROOT=~/knowledge-wiki ai-wiki search "python"
   +-- work-wiki/SKILL.md        (AI_WIKI_ROOT=~/work-wiki)
   +-- knowledge-wiki/SKILL.md   (AI_WIKI_ROOT=~/knowledge-wiki)
 
-~/.agents/skills/  ...  ~/.codex/skills/  (same pattern)
+~/.gemini/config/skills/  ...  ~/.codex/skills/  (same pattern)
 
 Project A --+
 Project B --+-- Access both wiki skills
@@ -589,7 +593,7 @@ Skill files are **auto-generated** during `ai-wiki init`. When an agent receives
 | Agent | Skill Path |
 |-------|------------|
 | Claude Code | `~/.claude/skills/<wiki-name>/` |
-| Gemini CLI | `~/.agents/skills/<wiki-name>/` |
+| Gemini via Antigravity CLI | `~/.gemini/config/skills/<wiki-name>/` |
 | GPT Codex | `~/.codex/skills/<wiki-name>/` |
 
 **Skills are installed only to the agents you select during init.**

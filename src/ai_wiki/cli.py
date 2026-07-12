@@ -221,8 +221,16 @@ def cli(ctx):
 
 _AGENT_SKILL_PATHS = {
     "claude": lambda name: Path.home() / ".claude" / "skills" / name,
-    "gemini": lambda name: Path.home() / ".agents" / "skills" / name,
+    "gemini": lambda name: Path.home() / ".gemini" / "config" / "skills" / name,
     "codex": lambda name: Path.home() / ".codex" / "skills" / name,
+}
+
+_LEGACY_AGENT_SKILL_PATHS = {
+    "gemini": (
+        lambda name: Path.home() / ".agents" / "skills" / name,
+        lambda name: Path.home() / ".gemini" / "skills" / name,
+        lambda name: Path.home() / ".gemini" / "antigravity-cli" / "skills" / name,
+    ),
 }
 
 _AGENT_LABELS = {
@@ -236,7 +244,7 @@ def _prompt_agent_selection() -> "list[str]":
     """Interactive prompt for agent selection. Returns a list of selected agent keys."""
     click.echo("Which AI agents do you use? (comma-separated numbers)")
     click.echo("  1. Claude Code")
-    click.echo("  2. Gemini CLI")
+    click.echo("  2. Gemini via Antigravity CLI")
     click.echo("  3. GPT Codex")
     raw = click.prompt("Select [1,2,3] (default: 1)", default="1")
     selected: list[str] = []
@@ -2970,14 +2978,16 @@ def destroy(ctx, path, confirm):
     if wiki_name:
         for _agent in destroy_agents:
             _path_fn = _AGENT_SKILL_PATHS.get(_agent)
-            if _path_fn is None:
-                continue
-            _skill_dir = _path_fn(wiki_name)
-            if _skill_dir.exists():
-                try:
-                    shutil.rmtree(_skill_dir)
-                except Exception as _e:
-                    logger.warning("Could not remove %s skill dir: %s", _agent, _e)
+            _path_fns = ([_path_fn] if _path_fn is not None else []) + list(
+                _LEGACY_AGENT_SKILL_PATHS.get(_agent, ())
+            )
+            for _candidate_fn in _path_fns:
+                _skill_dir = _candidate_fn(wiki_name)
+                if _skill_dir.exists():
+                    try:
+                        shutil.rmtree(_skill_dir)
+                    except Exception as _e:
+                        logger.warning("Could not remove %s skill dir: %s", _agent, _e)
 
     # 8. Remove the entire wiki directory
     try:
@@ -3045,7 +3055,7 @@ def upgrade_skill():
     # Copy skill files only to the selected agent paths
     _AGENT_DISPLAY = {
         "claude": "Claude Code",
-        "gemini": "Gemini CLI",
+        "gemini": "Gemini via Antigravity CLI",
         "codex": "GPT Codex",
     }
     for agent in agents:

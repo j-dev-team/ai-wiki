@@ -15,7 +15,7 @@ AI Wiki는 AI가 지식을 검색하고 읽고 부분 수정하며 재사용하�
 - 벡터 검색 필수 지원: `sentence-transformers`와 `sqlite-vec` 기반 의미 검색
 - 품질 게이트: 출처, 필드 수, 내용 길이, 검증 메타데이터를 기준으로 문서 품질 평가
 - 관계 관리: related/backlinks, 고립 문서, 단방향 링크, 깨진 참조 점검
-- AI 에이전트 연동: Claude Code, Gemini CLI, GPT Codex용 skill 파일 생성
+- AI 에이전트 연동: Claude Code, Antigravity CLI의 Gemini, GPT Codex용 skill 파일 생성
 - 로컬 웹 UI: 검색, 문서 조회/작성/수정, 그래프, 대시보드 제공
 - 운영 명령: `doctor`, `lint`, `maintain`, `quality`, `todo`, `gaps`, `stale`, `vindex`
 
@@ -169,7 +169,7 @@ my-wiki/
 | 에이전트 | 경로 |
 | --- | --- |
 | Claude Code | `~/.claude/skills/<wiki-name>/` |
-| Gemini CLI | `~/.agents/skills/<wiki-name>/` |
+| Antigravity CLI의 Gemini | `~/.gemini/config/skills/<wiki-name>/` |
 | GPT Codex | `~/.codex/skills/<wiki-name>/` |
 
 skill 파일을 최신 버전으로 다시 설치하려면:

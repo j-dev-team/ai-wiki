@@ -66,7 +66,7 @@ def install_variant_skills(package_dir: Path, agents: tuple[str, ...]) -> dict[s
         raise FileNotFoundError(f"skill templates not found: {source_dir}")
     bases = {
         "claude": Path.home() / ".claude" / "skills",
-        "gemini": Path.home() / ".agents" / "skills",
+        "gemini": Path.home() / ".gemini" / "config" / "skills",
         "codex": Path.home() / ".codex" / "skills",
     }
     installed = []
@@ -96,7 +96,7 @@ def audit_skill_installation(package_dirs: list[Path]) -> dict[str, Any]:
     missing = []
     bases = {
         "claude": Path.home() / ".claude" / "skills",
-        "gemini": Path.home() / ".agents" / "skills",
+        "gemini": Path.home() / ".gemini" / "config" / "skills",
         "codex": Path.home() / ".codex" / "skills",
     }
     for package_dir in package_dirs:

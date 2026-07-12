@@ -8,6 +8,7 @@
 - Exclude pending unverified drafts from normal context while preserving them for verification.
 - Replace agent skill workflows with context-first retrieval and evidence-linked writeback.
 - Add deterministic protocol benchmarks and live Codex, Claude, and Gemini acceptance evaluation.
+- Use Antigravity CLI for Gemini evaluation and install Gemini skills under its global config path.
 
 ## 0.3.0 - 2026-07-11
 

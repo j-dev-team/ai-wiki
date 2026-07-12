@@ -29,7 +29,7 @@ content:
       init, destroy, upgrade-skill, export, export-all"
     - "하이브리드 검색: FTS5 키워드 + 벡터(sentence-transformers/sqlite-vec) + RRF(Reciprocal Rank Fusion)로
       hybrid_score 반환"
-    - "에이전트 스킬 3종: Claude Code(~/.claude/skills/), Gemini CLI(~/.gemini/skills/),
+    - "에이전트 스킬 3종: Claude Code(~/.claude/skills/), Antigravity CLI의 Gemini(~/.gemini/config/skills/),
       GPT Codex(~/.codex/skills/) — init 시 선택적으로 설치"
     - "init 대화형 절차: 언어(en/ko) -> 위키 이름 -> 에이전트 선택 -> 프리셋(general/tech/business/research)"
     - "품질 게이트: content 키 5개 미만/200자 미만/출처 없으면 create 거부"
@@ -53,7 +53,7 @@ content:
     cli_commands: 37
     skill_agents:
       - Claude Code
-      - Gemini CLI
+      - Antigravity CLI의 Gemini
       - GPT Codex
   _meta:
     maturity: mature

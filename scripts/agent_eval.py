@@ -196,9 +196,14 @@ def _extract_result(agent: str, stdout: str, final_file: Path) -> dict:
 
 def _command(agent: str, root: Path, schema_path: Path, final_file: Path) -> list[str]:
     prompt = _prompt()
-    executable = shutil.which(agent) or shutil.which(f"{agent}.cmd")
+    executable_name = "agy" if agent == "gemini" else agent
+    executable = shutil.which(executable_name) or shutil.which(f"{executable_name}.cmd")
+    if agent == "gemini" and not executable:
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        candidate = Path(local_app_data) / "agy" / "bin" / "agy.exe" if local_app_data else None
+        executable = str(candidate) if candidate and candidate.exists() else None
     if not executable:
-        raise FileNotFoundError(f"{agent} executable not found")
+        raise FileNotFoundError(f"{executable_name} executable not found")
     if agent == "codex":
         return [executable, "exec", "--skip-git-repo-check", "--ephemeral",
                 "--ignore-user-config", "--ignore-rules",
@@ -209,7 +214,8 @@ def _command(agent: str, root: Path, schema_path: Path, final_file: Path) -> lis
                 "--no-session-persistence", "--output-format", "json",
                 "--json-schema", json.dumps(_schema()), "--max-budget-usd", "2.00"]
     if agent == "gemini":
-        return [executable, "-p", prompt, "--approval-mode", "yolo", "-o", "json"]
+        return [executable, "--print", prompt, "--dangerously-skip-permissions",
+                "--print-timeout", "15m"]
     raise ValueError(agent)
 
 

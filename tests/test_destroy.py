@@ -98,9 +98,12 @@ def test_destroy_removes_gemini_skill(tmp_path):
     '''gemini skill folder deletion check.'''
     _make_wiki_with_config(tmp_path, name="skillwiki", env_var="SKILLWIKI_ROOT")
 
-    skill_dir = Path.home() / ".agents" / "skills" / "skillwiki"
+    skill_dir = Path.home() / ".gemini" / "config" / "skills" / "skillwiki"
+    legacy_skill_dir = Path.home() / ".agents" / "skills" / "skillwiki"
     skill_dir.mkdir(parents=True, exist_ok=True)
+    legacy_skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "SKILL.md").write_text("# test skill", encoding="utf-8")
+    (legacy_skill_dir / "SKILL.md").write_text("# legacy test skill", encoding="utf-8")
 
     try:
         os.environ["AI_WIKI_ROOT"] = str(tmp_path)
@@ -109,10 +112,12 @@ def test_destroy_removes_gemini_skill(tmp_path):
 
         assert result.exit_code == 0, f"Output: {result.output}"
         assert not skill_dir.exists(), "gemini skill dir should be removed"
+        assert not legacy_skill_dir.exists(), "legacy gemini skill dir should be removed"
     finally:
-        if skill_dir.exists():
-            import shutil
-            shutil.rmtree(skill_dir)
+        import shutil
+        for candidate in (skill_dir, legacy_skill_dir):
+            if candidate.exists():
+                shutil.rmtree(candidate)
 def test_destroy_removes_claude_skill(tmp_path):
     """claude 스킬 폴더도 함께 삭제되는지 확인."""
     import shutil as _shutil
@@ -144,7 +149,7 @@ def test_destroy_removes_all_skill_dirs(tmp_path):
     _make_wiki_with_config(tmp_path, name="bothwiki", env_var="BOTHWIKI_ROOT")
 
     claude_skill_dir = Path.home() / ".claude" / "skills" / "bothwiki"
-    gemini_skill_dir = Path.home() / ".agents" / "skills" / "bothwiki"
+    gemini_skill_dir = Path.home() / ".gemini" / "config" / "skills" / "bothwiki"
     codex_skill_dir = Path.home() / ".codex" / "skills" / "bothwiki"
 
     claude_skill_dir.mkdir(parents=True, exist_ok=True)
@@ -219,7 +224,7 @@ def test_init_creates_skill_dirs(tmp_path):
 
     wiki_name = tmp_path.name
     claude_skill_dir = Path.home() / ".claude" / "skills" / wiki_name
-    gemini_skill_dir = Path.home() / ".agents" / "skills" / wiki_name
+    gemini_skill_dir = Path.home() / ".gemini" / "config" / "skills" / wiki_name
     codex_skill_dir = Path.home() / ".codex" / "skills" / wiki_name
 
     assert not claude_skill_dir.exists(), f"{claude_skill_dir} should not exist before test"

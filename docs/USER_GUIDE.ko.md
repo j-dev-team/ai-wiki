@@ -93,7 +93,7 @@ ai-wiki init D:\wiki\my-wiki
 
 1. 화면 언어: 한국어 또는 영어
 2. 위키 표시 이름
-3. 연결할 AI 에이전트: Claude Code, Gemini CLI, GPT Codex
+3. 연결할 AI 에이전트: Claude Code, Antigravity CLI의 Gemini, GPT Codex
 4. 카테고리 프리셋: 범용, 기술, 비즈니스, 연구
 
 초기화가 끝나면 위키 루트와 설정이 등록됩니다. 현재 연결 상태는 다음 명령으로 확인합니다.
@@ -265,12 +265,22 @@ ai-wiki variant install-skills D:\dev\law-wiki --agent gemini
 ai-wiki variant install-skills D:\dev\law-wiki --agent codex
 ```
 
+Gemini 에이전트는 기존 `gemini` 명령 대신 Antigravity CLI의 `agy`를 사용합니다.
+Windows에서는 다음 명령으로 설치하고, 유료 Gemini 계정으로 한 번 인증합니다.
+
+```powershell
+irm https://antigravity.google/cli/install.ps1 | iex
+agy
+```
+
+인증 후 `agy --print "OK라고 답해"`로 비대화식 실행을 확인할 수 있습니다.
+
 스킬 설치 경로는 다음과 같습니다.
 
 | 에이전트 | 경로 |
 | --- | --- |
 | Claude Code | `~/.claude/skills/<위키명>/` |
-| Gemini CLI | `~/.agents/skills/<위키명>/` |
+| Antigravity CLI의 Gemini | `~/.gemini/config/skills/<위키명>/` |
 | GPT Codex | `~/.codex/skills/<위키명>/` |
 
 ## 8. 사용자 정의 위키

@@ -71,7 +71,7 @@ ai-wiki variant install-skills D:\dev\law-wiki --agent codex
 | Agent | Skill directory |
 | --- | --- |
 | Claude Code | `~/.claude/skills/<wiki-name>/` |
-| Gemini CLI | `~/.agents/skills/<wiki-name>/` |
+| Gemini via Antigravity CLI | `~/.gemini/config/skills/<wiki-name>/` |
 | GPT Codex | `~/.codex/skills/<wiki-name>/` |
 
 ## Backup and Restore

@@ -135,15 +135,21 @@ def uninstall_variant(
         config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
         agents = config.get("agents") or []
     bases = {
-        "claude": Path.home() / ".claude" / "skills",
-        "gemini": Path.home() / ".agents" / "skills",
-        "codex": Path.home() / ".codex" / "skills",
+        "claude": [Path.home() / ".claude" / "skills"],
+        "gemini": [
+            Path.home() / ".gemini" / "config" / "skills",
+            Path.home() / ".agents" / "skills",
+            Path.home() / ".gemini" / "skills",
+            Path.home() / ".gemini" / "antigravity-cli" / "skills",
+        ],
+        "codex": [Path.home() / ".codex" / "skills"],
     }
     for agent in agents:
-        skill_dir = bases.get(agent, Path()) / package_dir.name
-        if agent in bases and skill_dir.exists():
-            shutil.rmtree(skill_dir)
-            removed_skills.append(str(skill_dir))
+        for base in bases.get(agent, []):
+            skill_dir = base / package_dir.name
+            if skill_dir.exists():
+                shutil.rmtree(skill_dir)
+                removed_skills.append(str(skill_dir))
     if purge:
         shutil.rmtree(package_dir)
     return {
