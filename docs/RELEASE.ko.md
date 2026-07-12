@@ -30,7 +30,8 @@ PyPI는 같은 버전의 파일을 교체할 수 없으므로, 게시 후 문제
 
 - 요구사항과 회귀 테스트 완료
 - 벡터 검색을 포함한 핵심 기능 정상
-- Codex, Claude Code, Antigravity CLI의 Gemini 스킬 호환성 확인
+- Codex와 Antigravity CLI의 Gemini 실평가 24/24 통과
+- Claude Code 스킬·프로토콜 정적 호환성 확인(유료 계정 실평가는 선택)
 - 데이터 마이그레이션이 있으면 백업·복원 시험 완료
 - 한국어·영어 UI와 문서 갱신
 

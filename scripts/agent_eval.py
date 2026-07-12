@@ -1,4 +1,8 @@
-"""Live Codex, Claude, and Gemini acceptance gate for the AI-first protocol."""
+"""Live Codex and Gemini acceptance gate for the AI-first protocol.
+
+Claude remains available through ``--agents claude`` when credentials exist,
+but is not part of the default release gate.
+"""
 from __future__ import annotations
 
 import argparse
@@ -289,7 +293,7 @@ def run_agent(agent: str, base: Path, timeout: int) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--agents", default="codex,claude,gemini")
+    parser.add_argument("--agents", default="codex,gemini")
     parser.add_argument("--output", default=str(REPO_ROOT / "tmp" / "agent-eval-report.json"))
     parser.add_argument("--timeout", type=int, default=900)
     args = parser.parse_args()

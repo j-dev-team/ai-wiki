@@ -7,7 +7,8 @@
 - Add optimistic, validated RFC 6902 patching and autonomous JSON document creation.
 - Exclude pending unverified drafts from normal context while preserving them for verification.
 - Replace agent skill workflows with context-first retrieval and evidence-linked writeback.
-- Add deterministic protocol benchmarks and live Codex, Claude, and Gemini acceptance evaluation.
+- Add deterministic protocol benchmarks and a 24-task live Codex and Gemini acceptance gate.
+- Keep Claude skill and protocol compatibility without requiring a paid live account for release.
 - Use Antigravity CLI for Gemini evaluation and install Gemini skills under its global config path.
 
 ## 0.3.0 - 2026-07-11
