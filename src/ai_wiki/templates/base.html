@@ -20,6 +20,8 @@
         <a href="/dashboard">{{ t('nav.quality') }}</a>
         <a href="/create">{{ t('nav.new') }}</a>
         <a href="/stale">{{ t('nav.stale') }}</a>
+        <a href="/missions">{{ t('nav.missions') }}</a>
+        <a href="/calibration">{{ t('nav.calibration') }}</a>
       </div>
       <form class="lang-selector" action="{{ request.path }}" method="get" title="{{ t('nav.language') }}">
         {% for key, values in request.args.lists() %}
@@ -51,7 +53,17 @@
   </main>
 
   <footer class="footer">
-    <p>{{ wiki_name }} v0.6.0 &mdash; {{ t('footer.text') }}</p>
+    <p>{{ wiki_name }} v1.0.0 &mdash; {{ t('footer.text') }}</p>
   </footer>
+{% if team_mode %}
+<script>
+document.querySelectorAll('form[method="post"], form[method="POST"]').forEach((form) => {
+  if (form.querySelector('input[name="csrf_token"]')) return;
+  const input = document.createElement('input');
+  input.type = 'hidden'; input.name = 'csrf_token'; input.value = {{ csrf_token|tojson }};
+  form.appendChild(input);
+});
+</script>
+{% endif %}
 </body>
 </html>

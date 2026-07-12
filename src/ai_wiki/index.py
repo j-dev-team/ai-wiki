@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -113,6 +114,76 @@ class WikiIndex:
                 recorded_at TEXT NOT NULL,
                 FOREIGN KEY (context_id) REFERENCES context_sessions(context_id)
             );
+            CREATE TABLE IF NOT EXISTS calibration_events (
+                event_id TEXT PRIMARY KEY,
+                context_id TEXT NOT NULL,
+                citation TEXT NOT NULL,
+                document_id TEXT NOT NULL,
+                chunk_id TEXT,
+                judgment TEXT NOT NULL,
+                evidence_type TEXT NOT NULL,
+                evidence_reference TEXT,
+                principal_id TEXT NOT NULL,
+                eligible INTEGER NOT NULL,
+                ineligible_reason TEXT,
+                model_scope TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (context_id) REFERENCES context_sessions(context_id)
+            );
+            CREATE TABLE IF NOT EXISTS calibration_runs (
+                run_id TEXT PRIMARY KEY,
+                scope_hash TEXT NOT NULL,
+                dataset_hash TEXT NOT NULL,
+                status TEXT NOT NULL,
+                train_count INTEGER NOT NULL,
+                holdout_count INTEGER NOT NULL,
+                metrics_json TEXT NOT NULL,
+                candidate_parameters TEXT,
+                baseline_run_id TEXT,
+                created_at TEXT NOT NULL,
+                completed_at TEXT,
+                rejection_reason TEXT
+            );
+            CREATE TABLE IF NOT EXISTS authorization_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                principal_id TEXT NOT NULL,
+                operation TEXT NOT NULL,
+                namespace TEXT NOT NULL,
+                allowed INTEGER NOT NULL,
+                reason TEXT,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS temporal_entities (
+                document_id TEXT NOT NULL, entity_id TEXT NOT NULL,
+                kind TEXT NOT NULL, name TEXT NOT NULL, payload TEXT NOT NULL,
+                PRIMARY KEY (document_id, entity_id)
+            );
+            CREATE TABLE IF NOT EXISTS temporal_evidence (
+                document_id TEXT NOT NULL, evidence_id TEXT NOT NULL,
+                source_id TEXT NOT NULL, observed_at TEXT NOT NULL, payload TEXT NOT NULL,
+                PRIMARY KEY (document_id, evidence_id)
+            );
+            CREATE TABLE IF NOT EXISTS temporal_events (
+                document_id TEXT NOT NULL, event_id TEXT NOT NULL,
+                occurred_at TEXT, started_at TEXT, ended_at TEXT, payload TEXT NOT NULL,
+                PRIMARY KEY (document_id, event_id)
+            );
+            CREATE TABLE IF NOT EXISTS temporal_claims (
+                document_id TEXT NOT NULL, claim_id TEXT NOT NULL,
+                subject_id TEXT NOT NULL, predicate TEXT NOT NULL, status TEXT NOT NULL,
+                valid_from TEXT, valid_to TEXT, observed_at TEXT NOT NULL,
+                recorded_at TEXT NOT NULL, payload TEXT NOT NULL,
+                PRIMARY KEY (document_id, claim_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_temporal_claim_lookup
+                ON temporal_claims(document_id, subject_id, predicate, status, valid_from, valid_to);
+            CREATE TABLE IF NOT EXISTS temporal_transitions (
+                document_id TEXT NOT NULL, transition_id TEXT NOT NULL,
+                from_claim_id TEXT, to_claim_id TEXT, relation TEXT NOT NULL,
+                event_id TEXT, status TEXT NOT NULL, recorded_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                PRIMARY KEY (document_id, transition_id)
+            );
         """)
         # 기존 DB 마이그레이션: 새 컬럼 추가
         for col, definition in [
@@ -127,6 +198,48 @@ class WikiIndex:
                 cur.execute(f"ALTER TABLE articles_meta ADD COLUMN {col} {definition}")
             except sqlite3.OperationalError:
                 pass
+        self.conn.commit()
+
+    def fts_integrity(self) -> dict:
+        """Check FTS5 shadow indexes, which SQLite quick_check does not cover."""
+        tables = {}
+        for table in ("articles_fts", "article_chunks_fts"):
+            try:
+                self.conn.execute(
+                    f"INSERT INTO {table}({table}) VALUES('integrity-check')"
+                )
+                tables[table] = {"ready": True, "error": None}
+            except sqlite3.DatabaseError as exc:
+                self.conn.rollback()
+                tables[table] = {"ready": False, "error": str(exc)}
+        return {
+            "ready": all(item["ready"] for item in tables.values()),
+            "tables": tables,
+        }
+
+    def _reset_fts_tables(self) -> None:
+        """Recreate FTS virtual tables so rebuild can recover shadow-table damage."""
+        self.conn.executescript("""
+            DROP TABLE IF EXISTS articles_fts;
+            DROP TABLE IF EXISTS article_chunks_fts;
+
+            CREATE VIRTUAL TABLE articles_fts USING fts5(
+                id UNINDEXED,
+                title,
+                category,
+                tags,
+                content_text,
+                tokenize='unicode61 remove_diacritics 2'
+            );
+
+            CREATE VIRTUAL TABLE article_chunks_fts USING fts5(
+                chunk_id UNINDEXED,
+                article_id UNINDEXED,
+                path UNINDEXED,
+                indexed_text,
+                tokenize='trigram'
+            );
+        """)
         self.conn.commit()
 
     def record_context(self, *, context_id: str, query: str, document_ids: list[str],
@@ -158,6 +271,68 @@ class WikiIndex:
         )
         self.conn.commit()
         return {"context_id": context_id, "outcome": outcome, "citations": citations, "recorded_at": now}
+
+    def record_feedback(self, context_id: str, feedback: dict, *, principal_id: str,
+                        roles: set[str], model_scope: str) -> dict:
+        row = self.conn.execute(
+            "SELECT citations FROM context_sessions WHERE context_id = ?", (context_id,)
+        ).fetchone()
+        if not row:
+            raise ValueError("context_not_found")
+        allowed = set(json.loads(row["citations"]))
+        citation = feedback.get("citation")
+        if citation not in allowed:
+            raise ValueError("invalid_citation")
+        judgment = feedback.get("judgment")
+        if judgment not in {"accepted", "rejected", "corrected"}:
+            raise ValueError("invalid_judgment")
+        evidence_type = feedback.get("evidence_type", "agent")
+        eligible = evidence_type in {"human", "verification", "external_eval"} and bool(
+            roles.intersection({"owner", "reviewer"}) or evidence_type == "external_eval"
+        )
+        reason = None if eligible else "agent_or_unverified_feedback"
+        key = citation.removeprefix("doc:")
+        document_id, _, path = key.partition("#")
+        event_id = uuid.uuid4().hex
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.conn.execute(
+            """INSERT INTO calibration_events
+               (event_id, context_id, citation, document_id, chunk_id, judgment,
+                evidence_type, evidence_reference, principal_id, eligible,
+                ineligible_reason, model_scope, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (event_id, context_id, citation, document_id, feedback.get("chunk_id"),
+             judgment, evidence_type, feedback.get("evidence_reference"), principal_id,
+             int(eligible), reason, model_scope, now),
+        )
+        self.conn.commit()
+        return {
+            "event_id": event_id, "context_id": context_id, "citation": citation,
+            "document_id": document_id, "path": path, "judgment": judgment,
+            "eligible": eligible, "ineligible_reason": reason, "recorded_at": now,
+        }
+
+    def record_authorization(self, principal_id: str, operation: str, namespace: str,
+                             allowed: bool, reason: str = "") -> None:
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.conn.execute(
+            """INSERT INTO authorization_audit
+               (principal_id, operation, namespace, allowed, reason, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (principal_id, operation, namespace, int(allowed), reason, now),
+        )
+        self.conn.commit()
+
+    def calibration_feedback_counts(self) -> dict:
+        row = self.conn.execute(
+            """SELECT COUNT(*) AS total,
+                      SUM(CASE WHEN eligible=1 THEN 1 ELSE 0 END) AS eligible,
+                      SUM(CASE WHEN eligible=1 AND judgment='accepted' THEN 1 ELSE 0 END) AS positive,
+                      SUM(CASE WHEN eligible=1 AND judgment IN ('rejected','corrected') THEN 1 ELSE 0 END) AS negative,
+                      COUNT(DISTINCT CASE WHEN eligible=1 THEN document_id END) AS documents
+               FROM calibration_events"""
+        ).fetchone()
+        return {key: int(row[key] or 0) for key in row.keys()}
 
     def _reconcile_pending_updates(self) -> None:
         """Recover YAML-to-index updates interrupted between file and DB commits."""
@@ -285,7 +460,54 @@ class WikiIndex:
                 (chunk.chunk_id, article.id, chunk.path, chunk.indexed_text),
             )
 
+        self._upsert_temporal(cur, article)
+
         self.conn.commit()
+
+    def _upsert_temporal(self, cur, article: Article) -> None:
+        for table in (
+            "temporal_entities", "temporal_evidence", "temporal_events",
+            "temporal_claims", "temporal_transitions",
+        ):
+            cur.execute(f"DELETE FROM {table} WHERE document_id=?", (article.id,))
+        raw = article.extensions.get("temporal") if isinstance(article.extensions, dict) else None
+        if not raw:
+            return
+        from ai_wiki.temporal_contracts import TemporalExtension
+        temporal = TemporalExtension.model_validate(raw)
+        dump = lambda value: json.dumps(value.model_dump(mode="json"), ensure_ascii=False)
+        for item in temporal.entities:
+            cur.execute(
+                "INSERT INTO temporal_entities VALUES (?, ?, ?, ?, ?)",
+                (article.id, item.id, item.kind, item.name, dump(item)),
+            )
+        for item in temporal.evidence:
+            cur.execute(
+                "INSERT INTO temporal_evidence VALUES (?, ?, ?, ?, ?)",
+                (article.id, item.id, item.source_id, item.observed_at.isoformat(), dump(item)),
+            )
+        for item in temporal.events:
+            cur.execute(
+                "INSERT INTO temporal_events VALUES (?, ?, ?, ?, ?, ?)",
+                (article.id, item.id,
+                 item.occurred_at.isoformat() if item.occurred_at else None,
+                 item.started_at.isoformat() if item.started_at else None,
+                 item.ended_at.isoformat() if item.ended_at else None, dump(item)),
+            )
+        for item in temporal.claims:
+            cur.execute(
+                "INSERT INTO temporal_claims VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (article.id, item.id, item.subject_id, item.predicate, item.status,
+                 item.valid_from.isoformat() if item.valid_from else None,
+                 item.valid_to.isoformat() if item.valid_to else None,
+                 item.observed_at.isoformat(), item.recorded_at.isoformat(), dump(item)),
+            )
+        for item in temporal.transitions:
+            cur.execute(
+                "INSERT INTO temporal_transitions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (article.id, item.id, item.from_claim_id, item.to_claim_id, item.relation,
+                 item.triggered_by_event_id, item.status, item.recorded_at.isoformat(), dump(item)),
+            )
 
     def remove(self, article_id: str) -> None:
         cur = self.conn.cursor()
@@ -296,6 +518,11 @@ class WikiIndex:
         cur.execute("DELETE FROM article_sources WHERE article_id = ?", (article_id,))
         cur.execute("DELETE FROM article_chunks_fts WHERE article_id = ?", (article_id,))
         cur.execute("DELETE FROM article_chunks WHERE article_id = ?", (article_id,))
+        for table in (
+            "temporal_entities", "temporal_evidence", "temporal_events",
+            "temporal_claims", "temporal_transitions",
+        ):
+            cur.execute(f"DELETE FROM {table} WHERE document_id=?", (article_id,))
         self.conn.commit()
 
     def chunk_count(self) -> int:
@@ -953,10 +1180,16 @@ class WikiIndex:
     def rebuild(self, articles: list[tuple[Article, str]]) -> None:
         cur = self.conn.cursor()
         cur.execute("DELETE FROM articles_meta")
-        cur.execute("DELETE FROM articles_fts")
+        cur.execute("DELETE FROM article_chunks")
         cur.execute("DELETE FROM article_relations")
         cur.execute("DELETE FROM article_sources")
+        for table in (
+            "temporal_entities", "temporal_evidence", "temporal_events",
+            "temporal_claims", "temporal_transitions",
+        ):
+            cur.execute(f"DELETE FROM {table}")
         self.conn.commit()
+        self._reset_fts_tables()
 
         for article, file_path in articles:
             self.upsert(article, file_path)

@@ -399,7 +399,7 @@ def _find_installed_command(command_name: str, python_executable: str | None = N
 def _write_variant_module(target_dir: Path, spec: VariantSpec) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
     runtime_spec = repr(spec.as_dict())
-    (target_dir / "__init__.py").write_text('__version__ = "0.6.0"\n', encoding="utf-8")
+    (target_dir / "__init__.py").write_text('__version__ = "1.0.0"\n', encoding="utf-8")
     (target_dir / "cli.py").write_text(
         "from pathlib import Path\n\n"
         "from ai_wiki.runtime import activate_variant\n\n"
@@ -435,12 +435,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "{spec.package_name}"
-version = "0.6.0"
+version = "1.0.0"
 description = "{_toml_string(spec.description)}"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-dependencies = ["ai-wiki>=0.6,<0.7"]
+dependencies = ["ai-wiki>=1.0,<1.1"]
 
 [project.scripts]
 {spec.command_name} = "{spec.module_name}.cli:cli"
@@ -531,7 +531,7 @@ def _render_skill(spec: VariantSpec) -> str:
     )
     return f"""---
 name: {spec.skill_name}
-version: 0.6.0
+version: 1.0.0
 description: {spec.description} Use this skill whenever the request is about {trigger_text} knowledge, research, records, or retrieval in this dedicated domain. {routing_text}
 user-invocable: true
 argument-hint: "[capabilities|context|get|record-use|patch|create] [query or options]"

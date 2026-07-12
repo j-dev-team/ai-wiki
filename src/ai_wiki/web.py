@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
 from ai_wiki.yaml_loader import load_yaml_text
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, g, abort
 
 from ai_wiki.index import WikiIndex
-from ai_wiki.i18n import LANG_LABELS, SUPPORTED_LANGS, default_lang, translate
+from ai_wiki.i18n import LANG_LABELS, SUPPORTED_LANGS, default_lang, display_label, display_value, translate
 from ai_wiki.models import Article
 from ai_wiki.catalog import rebuild_catalog
 from ai_wiki.schemas import TYPE_SCHEMAS, build_content_template, register_custom_types
@@ -35,6 +36,24 @@ app = Flask(
     static_folder=str(Path(__file__).parent / "static"),
 )
 app.secret_key = os.environ.get("AI_WIKI_SECRET", os.urandom(24).hex())
+_TEAM_MODE = os.environ.get("AI_WIKI_TEAM_MODE") == "1"
+if _TEAM_MODE:
+    if "AI_WIKI_SECRET" not in os.environ:
+        raise RuntimeError("team mode requires a persistent AI_WIKI_SECRET")
+    app.config.update(
+        SESSION_COOKIE_SECURE=os.environ.get("AI_WIKI_COOKIE_SECURE", "1") == "1",
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+    )
+_team_security = None
+
+
+def get_team_security():
+    global _team_security
+    if _team_security is None:
+        from ai_wiki.team_security import TeamSecurity
+        _team_security = TeamSecurity(get_wiki_root())
+    return _team_security
 
 # ── 위키 이름 설정 ──────────────────────────────────
 def _load_wiki_name() -> str:
@@ -60,6 +79,58 @@ def _select_language() -> None:
         session["ai_wiki_lang"] = default_lang()
 
 
+@app.before_request
+def _team_authentication():
+    if not _TEAM_MODE or request.endpoint in {"team_login", "static"}:
+        return None
+    security = get_team_security()
+    key = f"{request.remote_addr}:{request.endpoint}"
+    if not security.rate_limit(key):
+        abort(429)
+    bearer = request.headers.get("Authorization", "")
+    principal = security.verify_token(bearer[7:]) if bearer.startswith("Bearer ") else None
+    if principal is None and session.get("team_user"):
+        principal = {"id": session["team_user"], "roles": session.get("team_roles", [])}
+    if principal is None:
+        if request.path.startswith("/api/"):
+            return jsonify({"status": "error", "error": {"code": "authentication_required"}}), 401
+        return redirect(url_for("team_login", next=request.full_path))
+    g.principal = principal
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        roles = set(principal.get("roles", []))
+        required = {"owner"} if request.endpoint in {"delete_article", "api_delete_article"} else {
+            "owner", "reviewer", "agent",
+        }
+        if not roles.intersection(required):
+            security.audit(principal["id"], "web_mutation", request.path, False, "role denied")
+            abort(403)
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"} and not bearer.startswith("Bearer "):
+        supplied = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token")
+        if not supplied or not secrets.compare_digest(supplied, session.get("csrf_token", "")):
+            abort(403)
+    return None
+
+
+@app.route("/team/login", methods=["GET", "POST"])
+def team_login():
+    if not _TEAM_MODE:
+        abort(404)
+    error = None
+    if request.method == "POST":
+        security = get_team_security()
+        if not security.rate_limit(f"login:{request.remote_addr}", limit=10, window_seconds=300):
+            abort(429)
+        principal = security.verify_password(request.form.get("user_id", ""), request.form.get("password", ""))
+        if principal:
+            session.clear()
+            session["team_user"] = principal["id"]
+            session["team_roles"] = principal["roles"]
+            session["csrf_token"] = secrets.token_urlsafe(32)
+            return redirect(request.args.get("next") or url_for("home"))
+        error = "Invalid credentials"
+    return render_template("team_login.html", error=error)
+
+
 def _current_lang() -> str:
     lang = session.get("ai_wiki_lang", default_lang())
     return lang if lang in SUPPORTED_LANGS else default_lang()
@@ -73,6 +144,10 @@ def _inject_i18n():
         "supported_langs": SUPPORTED_LANGS,
         "lang_labels": LANG_LABELS,
         "t": lambda key, **kwargs: translate(lang, key, **kwargs),
+        "label": lambda value: display_label(value, lang),
+        "easy": lambda value: display_value(value, lang),
+        "team_mode": _TEAM_MODE,
+        "csrf_token": session.get("csrf_token", ""),
     }
 
 
@@ -561,6 +636,235 @@ def api_stats():
     cat_stats = idx.get_category_stats()
     categories = {s["category"]: s["count"] for s in cat_stats}
     return jsonify({"status": "ok", "total": idx.count(), "categories": categories})
+
+
+@app.route("/missions")
+def missions_view():
+    from ai_wiki.policy import PolicyDenied
+
+    kind = request.args.get("kind") or None
+    status = request.args.get("status") or None
+    plan_id = request.args.get("plan") or None
+    query_error = None
+    access_error = None
+    page = {"items": [], "total": 0, "limit": 25, "offset": 0, "has_more": False}
+    store = None
+    try:
+        if kind and kind not in _MISSION_KINDS:
+            raise ValueError("invalid_kind")
+        if status and status not in _MISSION_STATUSES:
+            raise ValueError("invalid_status")
+        limit = _positive_query_int("limit", 25) or 25
+        offset = int(request.args.get("offset", "0"))
+        if offset < 0:
+            raise ValueError("invalid_offset")
+        store, reader = _mission_reader()
+        page = reader.list(
+            kind=kind, status=status, plan_id=plan_id,
+            run_id=request.args.get("run") or None,
+            limit=limit, offset=offset,
+        )
+    except PolicyDenied:
+        access_error = "permission_denied"
+    except (TypeError, ValueError) as exc:
+        query_error = str(exc) or "invalid_query"
+    finally:
+        if store is not None:
+            store.close()
+
+    def page_url(offset: int) -> str:
+        values = request.args.to_dict(flat=True)
+        values["offset"] = str(offset)
+        values["limit"] = str(page["limit"])
+        return url_for("missions_view", **values)
+
+    previous_url = page_url(max(0, page["offset"] - page["limit"])) if page["offset"] else None
+    next_url = page_url(page["offset"] + page["limit"]) if page["has_more"] else None
+    response = render_template(
+        "missions.html", missions=page["items"], total=page["total"],
+        limit=page["limit"], offset=page["offset"], has_more=page["has_more"],
+        page_end=page["offset"] + len(page["items"]),
+        previous_url=previous_url, next_url=next_url,
+        kind_options=sorted(_MISSION_KINDS), status_options=sorted(_MISSION_STATUSES),
+        selected_kind=kind or "", selected_status=status or "", selected_plan=plan_id or "",
+        active_filters=bool(kind or status or plan_id or request.args.get("run")),
+        query_error=query_error, access_error=access_error,
+    )
+    if access_error:
+        return response, 403
+    if query_error:
+        return response, 400
+    return response
+
+
+_MISSION_KINDS = {
+    "research_report", "work_plan", "work_run", "knowledge_candidate",
+}
+_MISSION_STATUSES = {
+    "draft", "proposed", "approved", "rejected", "active", "superseded",
+    "cancelled", "completed", "created", "running", "paused", "blocked",
+    "failed", "in_review", "pending", "promoted",
+}
+
+
+def _mission_reader():
+    from ai_wiki.missions import MissionControlReader, MissionStore
+    from ai_wiki.policy import Principal, SecurityPolicy
+
+    root = get_wiki_root()
+    policy = SecurityPolicy(root)
+    if _TEAM_MODE:
+        principal = Principal(
+            str(g.principal["id"]),
+            frozenset(str(role) for role in g.principal.get("roles", [])),
+        )
+    else:
+        principal = policy.resolve()
+    store = MissionStore(root)
+    return store, MissionControlReader(store, policy, principal)
+
+
+def _positive_query_int(name: str, default: int | None = None) -> int | None:
+    raw = request.args.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"invalid_{name}") from exc
+    if value < 1:
+        raise ValueError(f"invalid_{name}")
+    return value
+
+
+@app.route("/api/missions")
+def api_missions():
+    from ai_wiki.policy import PolicyDenied
+
+    kind = request.args.get("kind") or None
+    status = request.args.get("status") or None
+    if kind and kind not in _MISSION_KINDS:
+        return jsonify({"status": "error", "error": {"code": "invalid_kind"}}), 400
+    if status and status not in _MISSION_STATUSES:
+        return jsonify({"status": "error", "error": {"code": "invalid_status"}}), 400
+    try:
+        limit = _positive_query_int("limit", 50)
+        raw_offset = request.args.get("offset", "0")
+        offset = int(raw_offset)
+        if offset < 0:
+            raise ValueError("invalid_offset")
+        store, reader = _mission_reader()
+        try:
+            page = reader.list(
+                kind=kind, status=status,
+                plan_id=request.args.get("plan") or None,
+                run_id=request.args.get("run") or None,
+                limit=limit or 50, offset=offset,
+            )
+        finally:
+            store.close()
+    except PolicyDenied as exc:
+        return jsonify({"status": "error", "error": {"code": exc.code}}), 403
+    except (TypeError, ValueError) as exc:
+        return jsonify({
+            "status": "error", "error": {"code": str(exc) or "invalid_query"},
+        }), 400
+    return jsonify({
+        "status": "ok", "count": len(page["items"]),
+        "total": page["total"], "limit": page["limit"],
+        "offset": page["offset"], "has_more": page["has_more"],
+        "missions": page["items"],
+    })
+
+
+@app.route("/api/missions/<path:mission_id>")
+def api_mission_detail(mission_id: str):
+    from ai_wiki.policy import PolicyDenied
+
+    try:
+        revision = _positive_query_int("revision")
+        store, reader = _mission_reader()
+        try:
+            detail = reader.detail(mission_id, revision)
+        finally:
+            store.close()
+    except PolicyDenied as exc:
+        return jsonify({"status": "error", "error": {"code": exc.code}}), 403
+    except ValueError as exc:
+        return jsonify({
+            "status": "error", "error": {"code": str(exc) or "invalid_query"},
+        }), 400
+    if detail is None:
+        return jsonify({
+            "status": "error", "error": {"code": "mission_not_found"},
+        }), 404
+    return jsonify({
+        "status": "ok", "mission": detail, "meta": {"policy": detail["policy"]},
+    })
+
+
+@app.route("/missions/<path:mission_id>")
+def mission_detail_view(mission_id: str):
+    from ai_wiki.policy import PolicyDenied
+
+    detail = None
+    error = None
+    previous_revision = None
+    next_revision = None
+    store = None
+    try:
+        revision = _positive_query_int("revision")
+        store, reader = _mission_reader()
+        detail = reader.detail(mission_id, revision)
+        if detail is None:
+            error = "not_found"
+        else:
+            current = int(detail["revision"])
+            if current > 1 and store.index_record(mission_id, current - 1):
+                previous_revision = current - 1
+            if store.index_record(mission_id, current + 1):
+                next_revision = current + 1
+    except PolicyDenied:
+        error = "permission_denied"
+    except (TypeError, ValueError):
+        error = "invalid_revision"
+    finally:
+        if store is not None:
+            store.close()
+    response = render_template(
+        "mission_detail.html", mission=detail, mission_id=mission_id,
+        error=error, previous_revision=previous_revision, next_revision=next_revision,
+    )
+    if error == "permission_denied":
+        return response, 403
+    if error == "invalid_revision":
+        return response, 400
+    if error == "not_found":
+        return response, 404
+    return response
+
+
+@app.route("/temporal/<path:article_id>")
+def temporal_view(article_id: str):
+    from ai_wiki.temporal import TemporalQueries
+    query = TemporalQueries(get_index())
+    return render_template(
+        "temporal.html", article_id=article_id,
+        current=query.current(article_id), timeline=query.timeline(article_id),
+        disputed=query.disputed(article_id), conflicts=query.propose_conflicts(article_id),
+    )
+
+
+@app.route("/calibration")
+def calibration_view():
+    from ai_wiki.calibration import CalibrationManager
+    from ai_wiki.vector import VectorIndex
+    vector = VectorIndex()
+    try:
+        status = CalibrationManager(get_index(), vector).status()
+    finally:
+        vector.close()
+    return render_template("calibration.html", status=status)
 
 
 

@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% block title %}{{ mission.id if mission else mission_id }} - {{ t('missions.title') }}{% endblock %}
+{% block content %}
+<div class="mission-control mission-detail-shell">
+  <a class="mission-skip-link" href="#mission-detail-main">{{ t('accessibility.skip_mission_detail') }}</a>
+  <nav class="mission-breadcrumb" aria-label="{{ t('mission_detail.breadcrumb') }}">
+    <a href="{{ url_for('missions_view', lang=lang) }}">{{ t('missions.title') }}</a>
+    <span aria-hidden="true">/</span>
+    <span aria-current="page">{{ mission.id if mission else mission_id }}</span>
+  </nav>
+
+  {% if error %}
+  <section class="mission-notice mission-notice-error" role="alert">
+    {% if error == 'invalid_revision' %}
+    <h1>{{ t('mission_detail.invalid_revision') }}</h1><p>{{ t('mission_detail.invalid_revision_help') }}</p>
+    {% elif error == 'permission_denied' %}
+    <h1>{{ t('missions.denied') }}</h1><p>{{ t('missions.denied_help') }}</p>
+    {% else %}
+    <h1>{{ t('mission_detail.not_found') }}</h1><p>{{ t('mission_detail.not_found_help') }}</p>
+    {% endif %}
+    <a href="{{ url_for('missions_view', lang=lang) }}">{{ t('mission_detail.back_to_queue') }}</a>
+  </section>
+  {% else %}
+  <article class="mission-detail" id="mission-detail-main" tabindex="-1" aria-labelledby="mission-title">
+    <header class="mission-detail-masthead">
+      <div class="mission-detail-heading">
+        <div class="mission-row-labels">
+          <span class="mission-kind">{{ label(mission.kind) }}</span>
+          <span class="mission-revision">r{{ mission.revision }}</span>
+          <span class="mission-status"><span aria-hidden="true"></span>{{ easy(mission.status) }}</span>
+        </div>
+        <h1 id="mission-title">{{ mission.id }}</h1>
+        <p class="mission-detail-objective">{{ mission.summary.objective or t('missions.objective_unavailable') }}</p>
+      </div>
+      <aside class="mission-review-question" aria-label="{{ t('mission_detail.review_question') }}">
+        <p>{{ t('mission_detail.review_question') }}</p>
+        <strong>{{ t('mission_detail.review_prompt') }}</strong>
+      </aside>
+    </header>
+
+    <nav class="mission-revision-nav" aria-label="{{ t('mission_detail.revisions') }}">
+      {% if previous_revision %}<a rel="prev" href="{{ url_for('mission_detail_view', mission_id=mission.id, revision=previous_revision, lang=lang) }}">← r{{ previous_revision }}</a>{% else %}<span aria-disabled="true">←</span>{% endif %}
+      <span aria-current="page">{{ t('missions.revision') }} {{ mission.revision }}</span>
+      {% if next_revision %}<a rel="next" href="{{ url_for('mission_detail_view', mission_id=mission.id, revision=next_revision, lang=lang) }}">r{{ next_revision }} →</a>{% else %}<span aria-disabled="true">→</span>{% endif %}
+    </nav>
+
+    {% if mission.degraded %}
+    <section class="mission-degraded" aria-labelledby="degraded-title">
+      <h2 id="degraded-title">{{ t('mission_detail.degraded_title') }}</h2>
+      {% for item in mission.degraded %}
+      <div><strong>{{ item.code }}</strong><p>{{ item.message }}</p>{% if item.recovery %}<p>{{ item.recovery }}</p>{% endif %}</div>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    <section class="mission-detail-overview" aria-labelledby="overview-title">
+      <div class="mission-section-heading">
+        <p class="mission-kicker">{{ t('mission_detail.decision_context') }}</p>
+        <h2 id="overview-title">{{ t('mission_detail.overview') }}</h2>
+      </div>
+      <dl class="mission-detail-facts">
+        <div><dt>{{ t('missions.status') }}</dt><dd>{{ easy(mission.status) }}</dd></div>
+        <div><dt>{{ t('missions.owner') }}</dt><dd>{{ mission.metadata.created_by }}</dd></div>
+        <div><dt>{{ t('missions.updated') }}</dt><dd>{{ mission.metadata.modified_at }}</dd></div>
+        <div><dt>{{ t('mission_detail.created') }}</dt><dd>{{ mission.metadata.created_at }}</dd></div>
+        {% if mission.summary.approval %}<div><dt>{{ t('missions.approval') }}</dt><dd>{{ easy(mission.summary.approval.status) }}</dd></div>{% endif %}
+        <div><dt>{{ t('mission_detail.visibility') }}</dt><dd>{{ mission.policy.visibility }}{% if mission.policy.redacted_fields %} · {{ mission.policy.redacted_fields|length }} {{ t('mission_detail.redacted') }}{% endif %}</dd></div>
+      </dl>
+    </section>
+
+    {% if mission.kind in ['work_plan', 'work_run'] %}
+    <section class="mission-progress-section" aria-labelledby="progress-title">
+      <div class="mission-section-heading">
+        <p class="mission-kicker">{{ t('mission_detail.review_state') }}</p>
+        <h2 id="progress-title">{{ t('mission_detail.progress') }}</h2>
+      </div>
+      <dl class="mission-progress-ledger">
+        <div><dt>{{ t('missions.progress') }}</dt><dd>{{ mission.task_counts.completed or 0 }} / {{ mission.task_counts.total or 0 }}</dd></div>
+        <div><dt>{{ t('missions.in_review') }}</dt><dd>{{ mission.task_counts.in_review or 0 }}</dd></div>
+        <div><dt>{{ t('missions.blocked') }}</dt><dd>{{ mission.task_counts.blocked or 0 }}</dd></div>
+        <div><dt>{{ t('missions.criteria') }}</dt><dd>{{ mission.criterion_counts.covered or 0 }} / {{ mission.criterion_counts.total or 0 }}</dd></div>
+        <div><dt>{{ t('missions.evidence') }}</dt><dd>{{ mission.evidence_count or 0 }}</dd></div>
+        <div><dt>{{ t('missions.handoff') }}</dt><dd>{{ t('missions.recorded') if mission.handoff_count else t('missions.not_recorded') }}</dd></div>
+      </dl>
+      {% if (mission.task_counts.blocked or 0) > 0 %}<p class="mission-blocker-summary"><strong>{{ mission.task_counts.blocked }}</strong> {{ t('mission_detail.blocked_tasks') }}</p>{% endif %}
+    </section>
+    {% endif %}
+
+    {% if mission.kind == 'work_run' and mission.run %}
+    <section class="mission-plan-link" aria-labelledby="plan-link-title">
+      <div class="mission-section-heading"><p class="mission-kicker">{{ t('mission_detail.pinned_context') }}</p><h2 id="plan-link-title">{{ t('mission_detail.linked_plan') }}</h2></div>
+      <p>{{ t('mission_detail.run_uses_plan') }}</p>
+      <a href="{{ url_for('mission_detail_view', mission_id=mission.run.plan_id, revision=mission.run.plan_revision, lang=lang) }}">{{ mission.run.plan_id }} · r{{ mission.run.plan_revision }}</a>
+    </section>
+    {% elif mission.kind == 'work_plan' and mission.plan %}
+    <section class="mission-linked-runs" aria-labelledby="linked-runs-title">
+      <div class="mission-section-heading"><p class="mission-kicker">{{ t('mission_detail.execution_context') }}</p><h2 id="linked-runs-title">{{ t('missions.linked_runs') }}</h2></div>
+      {% if mission.plan.linked_runs %}
+      <ul>{% for run in mission.plan.linked_runs %}<li><a href="{{ url_for('mission_detail_view', mission_id=run.id, revision=run.revision, lang=lang) }}">{{ run.id }} · r{{ run.revision }}</a><span>{{ easy(run.status) }}</span></li>{% endfor %}</ul>
+      {% else %}<p>{{ t('mission_detail.no_runs') }}</p>{% endif %}
+    </section>
+    {% endif %}
+
+    {% if mission.summary.scope or mission.summary.constraints %}
+    <section class="mission-boundaries" aria-labelledby="boundaries-title">
+      <div class="mission-section-heading"><p class="mission-kicker">{{ t('mission_detail.boundaries') }}</p><h2 id="boundaries-title">{{ t('mission_detail.scope_constraints') }}</h2></div>
+      <div class="mission-boundary-grid">
+        <div><h3>{{ t('mission_detail.scope') }}</h3><ul>{% for item in mission.summary.scope %}<li>{{ item }}</li>{% else %}<li>{{ t('mission_detail.not_recorded') }}</li>{% endfor %}</ul></div>
+        <div><h3>{{ t('mission_detail.constraints') }}</h3><ul>{% for item in mission.summary.constraints %}<li>{{ item }}</li>{% else %}<li>{{ t('mission_detail.not_recorded') }}</li>{% endfor %}</ul></div>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if mission.kind in ['work_plan', 'work_run'] and mission.plan and mission.plan.global_criteria %}
+    <section class="mission-global-criteria" aria-labelledby="global-criteria-title">
+      <div class="mission-section-heading"><p class="mission-kicker">{{ t('mission_detail.completion_standard') }}</p><h2 id="global-criteria-title">{{ t('mission_detail.global_criteria') }}</h2></div>
+      <ol class="mission-proof-rail mission-global-proof-rail">
+        {% for criterion in mission.plan.global_criteria %}
+        <li id="criterion-global-{{ criterion.id }}" data-coverage="{{ criterion.coverage_status }}">
+          <span class="mission-proof-node" aria-hidden="true"></span>
+          <div class="mission-proof-content">
+            <div class="mission-proof-label"><code>{{ criterion.id }}</code><span>{{ t('criterion_state.' ~ criterion.coverage_status) }}</span></div>
+            <p>{{ criterion.text }}</p>
+            <div class="mission-proof-links">
+              <span>{{ criterion.evidence_count }} {{ t('mission_tasks.evidence_count') }}</span>
+              {% for evidence_id in criterion.evidence_ids %}<a href="#evidence-{{ evidence_id }}">{{ evidence_id }}</a>{% endfor %}
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+    </section>
+    {% endif %}
+
+    {% if mission.kind in ['work_plan', 'work_run'] and mission.tasks %}
+    <section class="mission-tasks" aria-labelledby="tasks-title">
+      <div class="mission-section-heading"><p class="mission-kicker">{{ t('mission_tasks.work_breakdown') }}</p><h2 id="tasks-title">{{ t('mission_tasks.title') }}</h2></div>
+      <div class="mission-task-workspace">
+        <nav class="mission-task-nav" id="task-navigator" aria-label="{{ t('mission_tasks.navigator') }}">
+          <p>{{ t('mission_tasks.navigator') }}</p>
+          <ol>
+            {% for task in mission.tasks %}
+            <li><a href="#task-{{ task.id }}"><span>{{ task.id }}</span><strong>{{ task.title }}</strong><small>{{ easy(task.status) }}</small></a></li>
+            {% endfor %}
+          </ol>
+        </nav>
+        <div class="mission-task-list">
+          {% for task in mission.tasks %}
+          <article class="mission-task-card" id="task-{{ task.id }}" aria-labelledby="task-title-{{ task.id }}">
+            <header class="mission-task-header">
+              <div><p class="mission-task-id">{{ task.id }}</p><h3 id="task-title-{{ task.id }}">{{ task.title }}</h3></div>
+              <span class="mission-task-status status-{{ task.status|replace('_', '-') }}">{{ easy(task.status) }}</span>
+            </header>
+            <details class="mission-task-disclosure" open>
+              <summary>{{ t('accessibility.task_disclosure') }}</summary>
+            <dl class="mission-task-facts">
+              <div><dt>{{ t('mission_tasks.assignee') }}</dt><dd>{{ task.assigned_to or t('mission_tasks.not_recorded') }}</dd></div>
+              <div><dt>{{ t('mission_tasks.attempt') }}</dt><dd>{{ task.attempt }}</dd></div>
+              <div><dt>{{ t('mission_tasks.started') }}</dt><dd>{{ task.started_at or t('mission_tasks.not_recorded') }}</dd></div>
+              <div><dt>{{ t('mission_tasks.completed') }}</dt><dd>{{ task.completed_at or t('mission_tasks.not_recorded') }}</dd></div>
+              <div><dt>{{ t('mission_tasks.readiness') }}</dt><dd>{% if task.ready %}{{ t('mission_tasks.ready') }}{% elif task.status == 'blocked' %}{{ t('mission_tasks.blocked') }}{% else %}{{ easy(task.status) }}{% endif %}</dd></div>
+            </dl>
+
+            <section class="mission-task-instructions" aria-labelledby="instructions-{{ task.id }}">
+              <h4 id="instructions-{{ task.id }}">{{ t('mission_tasks.instructions') }}</h4>
+              <p>{{ task.instructions or t('mission_tasks.not_recorded') }}</p>
+            </section>
+
+            <section class="mission-task-dependencies" aria-labelledby="dependencies-{{ task.id }}">
+              <h4 id="dependencies-{{ task.id }}">{{ t('mission_tasks.dependencies') }}</h4>
+              {% if task.dependencies %}<ul>{% for dependency in task.dependencies %}<li><a href="#task-{{ dependency }}">{{ dependency }}</a></li>{% endfor %}</ul>{% else %}<p>{{ t('mission_tasks.none') }}</p>{% endif %}
+            </section>
+
+            <div class="mission-task-detail-grid">
+              <section aria-labelledby="verification-{{ task.id }}"><h4 id="verification-{{ task.id }}">{{ t('mission_tasks.verification') }}</h4><ul>{% for item in task.verification %}<li><code>{{ item }}</code></li>{% else %}<li>{{ t('mission_tasks.not_recorded') }}</li>{% endfor %}</ul></section>
+              <section aria-labelledby="authorization-{{ task.id }}"><h4 id="authorization-{{ task.id }}">{{ t('mission_tasks.authorization') }}</h4><ul>{% for item in task.authorization %}<li>{{ item }}</li>{% else %}<li>{{ t('mission_tasks.not_recorded') }}</li>{% endfor %}</ul></section>
+              <section aria-labelledby="resources-{{ task.id }}"><h4 id="resources-{{ task.id }}">{{ t('mission_tasks.resources') }}</h4><ul>{% for item in task.resources %}<li><code>{{ item }}</code></li>{% else %}<li>{{ t('mission_tasks.not_recorded') }}</li>{% endfor %}</ul></section>
+              <section aria-labelledby="result-{{ task.id }}"><h4 id="result-{{ task.id }}">{{ t('mission_tasks.result') }}</h4><p>{{ task.result or t('mission_tasks.not_recorded') }}</p></section>
+            </div>
+
+            <section class="mission-task-criteria" aria-labelledby="criteria-{{ task.id }}">
+              <div class="mission-task-subheading"><h4 id="criteria-{{ task.id }}">{{ t('mission_tasks.criteria') }}</h4><span>{{ task.criteria|length }}</span></div>
+              <ol class="mission-proof-rail">
+                {% for criterion in task.criteria %}
+                <li id="criterion-{{ task.id }}-{{ criterion.id }}" data-coverage="{{ criterion.coverage_status }}">
+                  <span class="mission-proof-node" aria-hidden="true"></span>
+                  <div class="mission-proof-content">
+                    <div class="mission-proof-label"><code>{{ criterion.id }}</code><span>{{ t('criterion_state.' ~ criterion.coverage_status) }}</span></div>
+                    <p>{{ criterion.text }}</p>
+                    <div class="mission-proof-links">
+                      <span>{{ criterion.evidence_count }} {{ t('mission_tasks.evidence_count') }}</span>
+                      {% for evidence_id in criterion.evidence_ids %}<a href="#evidence-{{ evidence_id }}">{{ evidence_id }}</a>{% endfor %}
+                    </div>
+                  </div>
+                </li>
+                {% else %}<li class="mission-proof-empty">{{ t('mission_tasks.no_criteria') }}</li>{% endfor %}
+              </ol>
+            </section>
+            </details>
+            <a class="mission-back-to-tasks" href="#task-navigator">↑ {{ t('mission_tasks.back_to_navigator') }}</a>
+          </article>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    {% endif %}
+
+    {% if mission.kind == 'work_run' %}
+    <section class="mission-handoff-section" aria-labelledby="handoff-title">
+      <div class="mission-section-heading"><p class="mission-kicker">{{ t('mission_handoff.resume_context') }}</p><h2 id="handoff-title">{{ t('mission_handoff.title') }}</h2></div>
+      <div class="mission-handoff-state state-{{ mission.handoff.completeness.state }}">
+        <strong>{{ t('handoff_state.' ~ mission.handoff.completeness.state) }}</strong>
+        {% if mission.handoff.mode == 'legacy' %}<span>{{ t('mission_handoff.legacy') }}</span>{% elif mission.handoff.mode == 'typed' %}<span>{{ t('mission_handoff.typed') }}</span>{% else %}<span>{{ t('mission_handoff.empty') }}</span>{% endif %}
+        {% if mission.handoff.completeness.missing_fields %}<p>{{ t('mission_handoff.missing_fields') }}: {{ mission.handoff.completeness.missing_fields|join(', ') }}</p>{% endif %}
+      </div>
+      <div class="mission-handoff-current"><h3>{{ t('mission_handoff.current_state') }}</h3><p>{{ mission.handoff.current_state or t('mission_handoff.not_recorded') }}</p></div>
+      <div class="mission-handoff-columns">
+        <section aria-labelledby="changed-files-title"><h3 id="changed-files-title">{{ t('mission_handoff.changed_files') }}</h3><ul>{% for item in mission.handoff.changed_files %}<li>{% if item == '[redacted]' %}<span class="field-state redacted">{{ t('mission_evidence.redacted') }}</span>{% else %}<code>{{ item }}</code>{% endif %}</li>{% else %}<li class="mission-section-empty">{{ t('mission_handoff.none') }}</li>{% endfor %}</ul></section>
+        <section aria-labelledby="remaining-work-title"><h3 id="remaining-work-title">{{ t('mission_handoff.remaining_work') }}</h3><ol>{% for item in mission.handoff.remaining_work %}<li>{{ item }}</li>{% else %}<li class="mission-section-empty">{{ t('mission_handoff.none') }}</li>{% endfor %}</ol></section>
+        <section aria-labelledby="blockers-title"><h3 id="blockers-title">{{ t('mission_handoff.blockers') }}</h3><ul>{% for item in mission.handoff.blockers %}<li>{{ item }}</li>{% else %}<li class="mission-section-empty">{{ t('mission_handoff.none') }}</li>{% endfor %}</ul></section>
+      </div>
+      <div class="mission-handoff-links">
+        <section aria-labelledby="handoff-evidence-title"><h3 id="handoff-evidence-title">{{ t('mission_handoff.evidence') }}</h3><ul>{% for ref in mission.handoff.evidence_refs %}<li>{% if ref.href %}<a href="{{ ref.href }}">{{ ref.value }}</a>{% else %}<code>{{ ref.value }}</code><span>{{ t('handoff_reason.' ~ ref.reason) }}</span>{% endif %}</li>{% else %}<li class="mission-section-empty">{{ t('mission_handoff.none') }}</li>{% endfor %}</ul></section>
+        <section aria-labelledby="handoff-artifacts-title"><h3 id="handoff-artifacts-title">{{ t('mission_handoff.artifacts') }}</h3><ul>{% for ref in mission.handoff.artifact_refs %}<li>{% if ref.href %}<a href="{{ ref.href }}" rel="noopener noreferrer">{{ ref.value }}</a>{% elif ref.state == 'redacted' %}<span class="field-state redacted">{{ t('mission_evidence.redacted') }}</span>{% else %}<code>{{ ref.value }}</code><span>{{ t('handoff_reason.' ~ ref.reason) }}</span>{% endif %}</li>{% else %}<li class="mission-section-empty">{{ t('mission_handoff.none') }}</li>{% endfor %}</ul></section>
+      </div>
+      {% if mission.handoff.mode == 'legacy' and mission.handoff.legacy_fields %}<section class="mission-legacy-fields" aria-labelledby="legacy-fields-title"><h3 id="legacy-fields-title">{{ t('mission_handoff.legacy_fields') }}</h3><dl>{% for key, value in mission.handoff.legacy_fields.items() %}<div><dt>{{ key }}</dt><dd>{{ value|string|truncate(500, True) }}</dd></div>{% endfor %}</dl></section>{% endif %}
+      <dl class="mission-handoff-meta">
+        <div><dt>{{ t('mission_handoff.recorded_by') }}</dt><dd>{{ mission.handoff.recorded_by or t('mission_handoff.not_recorded') }}</dd></div>
+        <div><dt>{{ t('mission_handoff.recorded_at') }}</dt><dd>{{ mission.handoff.recorded_at or t('mission_handoff.not_recorded') }}</dd></div>
+        <div><dt>{{ t('mission_handoff.next_owner') }}</dt><dd>{{ mission.handoff.next_owner or t('mission_handoff.unassigned') }}</dd></div>
+      </dl>
+      <p class="mission-handoff-readonly"><strong>{{ t('mission_handoff.no_transfer') }}</strong> {{ t('mission_handoff.no_transfer_help') }}</p>
+    </section>
+    {% endif %}
+
+    <section class="mission-evidence-section" aria-labelledby="evidence-title">
+      <div class="mission-section-heading"><p class="mission-kicker">{{ t('mission_evidence.proof_record') }}</p><h2 id="evidence-title">{{ t('mission_evidence.title') }}</h2></div>
+      {% if mission.evidence %}
+      <div class="mission-evidence-list">
+        {% for item in mission.evidence %}
+        <details class="mission-evidence-card" id="evidence-{{ item.evidence_id }}" open aria-labelledby="evidence-title-{{ item.evidence_id }}">
+          <summary><div><span>{{ label(item.type) }}</span><h3 id="evidence-title-{{ item.evidence_id }}">{{ item.evidence_id }}</h3></div><span>{{ item.criterion_links|length }} {{ t('mission_evidence.linked_criteria') }}</span></summary>
+          {% if item.result == '[redacted]' or item.locator == '[redacted]' or item.content_hash == '[redacted]' %}<p class="mission-evidence-state is-redacted">{{ t('mission_evidence.redacted_help') }}</p>{% endif %}
+          {% if item.result == '[unavailable]' or item.locator == '[unavailable]' %}<p class="mission-evidence-state is-unavailable">{{ t('mission_evidence.unavailable_help') }}</p>{% endif %}
+          <dl class="mission-evidence-fields">
+            <div class="mission-evidence-result"><dt>{{ t('mission_evidence.result') }}</dt><dd>{% if item.result == '[redacted]' %}<span class="field-state redacted">{{ t('mission_evidence.redacted') }}</span>{% elif item.result == '[unavailable]' %}<span class="field-state unavailable">{{ t('mission_evidence.unavailable') }}</span>{% elif item.result %}<pre>{{ item.result }}</pre>{% else %}<span class="field-state absent">{{ t('mission_evidence.absent') }}</span>{% endif %}</dd></div>
+            <div><dt>{{ t('mission_evidence.locator') }}</dt><dd>{% if item.locator == '[redacted]' %}<span class="field-state redacted">{{ t('mission_evidence.redacted') }}</span>{% elif item.locator == '[unavailable]' %}<span class="field-state unavailable">{{ t('mission_evidence.unavailable') }}</span>{% elif item.locator %}<code>{{ item.locator }}</code>{% else %}<span class="field-state absent">{{ t('mission_evidence.absent') }}</span>{% endif %}</dd></div>
+            <div><dt>{{ t('mission_evidence.hash') }}</dt><dd>{% if item.content_hash == '[redacted]' %}<span class="field-state redacted">{{ t('mission_evidence.redacted') }}</span>{% elif item.content_hash %}<code>{{ item.content_hash }}</code>{% else %}<span class="field-state absent">{{ t('mission_evidence.absent') }}</span>{% endif %}</dd></div>
+            <div><dt>{{ t('mission_evidence.actor') }}</dt><dd>{{ item.captured_by or t('mission_evidence.absent') }}</dd></div>
+            <div><dt>{{ t('mission_evidence.time') }}</dt><dd>{{ item.captured_at or t('mission_evidence.absent') }}</dd></div>
+            <div><dt>{{ t('mission_evidence.sources') }}</dt><dd>{% if item.source_ids %}{% for source_id in item.source_ids %}<code>{{ source_id }}</code>{% endfor %}{% else %}<span class="field-state absent">{{ t('mission_evidence.absent') }}</span>{% endif %}</dd></div>
+            <div><dt>{{ t('mission_evidence.criterion_ids') }}</dt><dd>{% if item.criterion_ids %}{% for criterion_id in item.criterion_ids %}<code>{{ criterion_id }}</code>{% endfor %}{% else %}<span class="field-state absent">{{ t('mission_evidence.absent') }}</span>{% endif %}</dd></div>
+          </dl>
+          <footer class="mission-evidence-backlinks">
+            <strong>{{ t('mission_evidence.supports') }}</strong>
+            {% if item.criterion_links %}{% for link in item.criterion_links %}<a href="#{{ link.anchor }}">{{ link.task_id }} · {{ link.criterion_id }}</a>{% endfor %}{% else %}<span>{{ t('mission_evidence.no_links') }}</span>{% endif %}
+          </footer>
+        </details>
+        {% endfor %}
+      </div>
+      {% else %}<p class="mission-section-empty">{{ t('mission_evidence.empty') }}</p>{% endif %}
+    </section>
+
+    <section class="mission-trace-section" aria-labelledby="trace-title">
+      <div class="mission-section-heading"><p class="mission-kicker">{{ t('mission_trace.audit_record') }}</p><h2 id="trace-title">{{ t('mission_trace.title') }}</h2></div>
+      <div class="mission-trace-grid">
+        <section aria-labelledby="mission-history-title"><h3 id="mission-history-title">{{ t('mission_trace.mission_history') }}</h3><ol>{% for event in mission.history %}<li><time>{{ event.at }}</time><strong>{{ easy(event.new_status) }}</strong><span>{{ event.actor }}</span><p>{{ event.reason or t('mission_trace.no_reason') }}</p></li>{% else %}<li class="mission-section-empty">{{ t('mission_trace.empty') }}</li>{% endfor %}</ol></section>
+        <section aria-labelledby="execution-events-title"><h3 id="execution-events-title">{{ t('mission_trace.execution_events') }}</h3><ol>{% for event in mission.execution_events %}<li><time>{{ event.at }}</time><strong>{{ easy(event.new_status) }}</strong><span>{{ event.actor }}</span><p>{{ event.reason or t('mission_trace.no_reason') }}</p></li>{% else %}<li class="mission-section-empty">{{ t('mission_trace.empty') }}</li>{% endfor %}</ol></section>
+        <section aria-labelledby="review-decisions-title"><h3 id="review-decisions-title">{{ t('mission_trace.review_decisions') }}</h3><ol>{% for event in mission.review_decisions %}<li><time>{{ event.at }}</time><strong>{{ easy(event.new_status) }}</strong><span>{{ event.actor }}</span><p>{{ event.reason or t('mission_trace.no_reason') }}</p></li>{% else %}<li class="mission-section-empty">{{ t('mission_trace.empty') }}</li>{% endfor %}</ol></section>
+      </div>
+    </section>
+
+    <footer class="mission-readonly-note"><span aria-hidden="true">◉</span><p><strong>{{ t('mission_detail.readonly') }}</strong> {{ t('mission_detail.readonly_help') }}</p></footer>
+  </article>
+  {% endif %}
+</div>
+{% endblock %}

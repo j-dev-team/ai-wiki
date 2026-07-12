@@ -6,7 +6,7 @@ A CLI-based knowledge wiki system that stores, searches, and manages knowledge l
 
 [Korean User Guide](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md) | [Purpose-Specific Wiki Guide](https://github.com/j-dev-team/ai-wiki/blob/master/docs/VARIANTS.md)
 
-> **Security Notice**: AI Wiki has no authentication or authorization. It is designed for **local use only**. Do not expose the CLI, web UI, or data directory to external networks. All data is stored unencrypted on the local filesystem.
+> **Security Notice**: Local mode remains the default and must not be exposed to a network. Optional team mode adds authenticated sessions, API tokens, RBAC, CSRF, rate limiting, audit logs, and sensitive-field encryption; install it with `pip install "ai-wiki[team]"`. Full repository encryption remains the operating system's responsibility.
 
 ---
 
@@ -36,6 +36,10 @@ AI coding agents (Claude Code, Gemini via Antigravity CLI, GPT Codex) have no bu
 - **Token Optimization** — Efficient operation with large document sets via DB metadata queries
 - **Purpose-Specific Variants** — Install isolated law, labor, tax, business, research, or custom wikis backed by one shared engine
 - **Safe Lifecycle** — Backup, restore, migration, upgrade rollback, uninstall, isolation audit, and skill routing audit
+- **Temporal Evidence Ledger** — Reconstruct current, historical, and previously known claims without overwriting history
+- **AI Wiki Missions** — Revision-pinned plans, task leases, evidence review, pause/resume, and Codex/Gemini handoff
+- **Retrieval Trust Loop** — Independently labeled calibration candidates with holdout gates and rollback
+- **Read-Only Connectors** — Git, web, Google Drive, Notion, and Slack snapshots with provenance and permissions
 
 ---
 
@@ -70,6 +74,7 @@ ai-wiki capabilities
 ai-wiki context "How does optimistic concurrency protect wiki updates?" --max-tokens 4000 --require-vector
 ai-wiki get <document-id> --fields id,title,content.facts,sources
 ai-wiki record-use <context-id> --citation "doc:<id>#/content/data/facts/0" --outcome answered
+ai-wiki temporal as-of <document-id> --at 2026-01-01T00:00:00Z
 ```
 
 Reusable knowledge can be written without replacing the whole document:
@@ -82,8 +87,14 @@ ai-wiki create --document-file document.json
 ```
 
 Source-free knowledge is stored as a low-confidence pending draft and excluded
-from normal context retrieval. Existing v1 files are not rewritten by reads;
-only a successfully modified document is saved as v2.
+from normal context retrieval. Existing v1 and v2 files are not rewritten by
+reads. Modified legacy documents become v2; only documents receiving temporal
+data are lazily saved as v3.
+
+Mission work uses the separate `ai-wiki-missions` skill. AI Wiki stores the
+approved plan, run, lease, evidence, review, and handoff; Codex or Gemini does
+the actual file, command, browser, and research work. See
+[`docs/MISSIONS.md`](docs/MISSIONS.md).
 
 ### Developer Installation (source)
 
@@ -382,7 +393,7 @@ Existing v1 documents remain readable. Migrate them explicitly after upgrading:
 ```bash
 ai-wiki migrate-schema            # dry-run and validation report
 ai-wiki migrate-schema --apply    # backup, atomic conversion, index rebuild
-ai-wiki schema-json > schema.json # integration JSON Schema
+ai-wiki schema-json --legacy > schema.json # bare integration JSON Schema
 ```
 
 ### File Storage Path

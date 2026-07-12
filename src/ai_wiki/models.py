@@ -245,7 +245,11 @@ class Article:
             "history": history,
             "extensions": extensions,
         }
-        return validate_v2_document(document).model_dump(mode="json", exclude_none=True)
+        validated_v2 = validate_v2_document(document).model_dump(mode="json", exclude_none=True)
+        if self.schema_version == 3 or extensions.get("temporal"):
+            from ai_wiki.schema_v3 import v2_to_v3_view
+            return v2_to_v3_view(validated_v2)
+        return validated_v2
 
     def content_as_text(self) -> str:
         """content dict를 평탄화하여 검색용 텍스트로 변환. 예약키 제외.
@@ -320,6 +324,9 @@ class Article:
         if data.get("schema_version") == SCHEMA_VERSION:
             from ai_wiki.migration import v2_to_article_fields
             return cls(**v2_to_article_fields(data))
+        if data.get("schema_version") == 3:
+            from ai_wiki.schema_v3 import v3_to_article_fields
+            return cls(**v3_to_article_fields(data))
         if "schema_version" in data:
             raise ValueError(f"unsupported schema_version: {data['schema_version']}")
         tags = data.get("tags", [])

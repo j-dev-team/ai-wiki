@@ -9,7 +9,7 @@ from unittest.mock import patch
 import yaml
 from click.testing import CliRunner
 
-from ai_wiki.agent_protocol import estimate_tokens
+from ai_wiki.agent_protocol import build_context, estimate_tokens
 from ai_wiki.cli import cli
 from ai_wiki.index import WikiIndex
 from ai_wiki.models import Article
@@ -228,6 +228,28 @@ def test_context_interleaves_related_documents_before_limit(wiki_root, wiki_inde
     assert hub.id in [item["id"] for item in documents]
     relation = next(item for item in documents if item["id"] == related.id)
     assert relation["selection_reason"] == f"related:{hub.id}"
+
+
+def test_context_relation_does_not_demote_stronger_direct_match(wiki_root, wiki_index):
+    strong = _article(
+        "tech-strong-direct-abc123", title="Strong Direct", marker="strongdirect",
+    )
+    weak = _article(
+        "tech-weak-parent-abc123", title="Weak Parent", marker="weakparent",
+    )
+    weak.related = [strong.id]
+    _index_article(wiki_index, strong)
+    _index_article(wiki_index, weak)
+    wiki_index.search = lambda *args, **kwargs: [
+        {"id": strong.id, "hybrid_score": 0.04, "matched_chunks": []},
+        {"id": weak.id, "hybrid_score": 0.03, "matched_chunks": []},
+    ]
+
+    envelope = build_context(wiki_index, "strong direct", max_tokens=4000, limit=2)
+    documents = envelope["data"]["documents"]
+
+    assert [item["id"] for item in documents] == [strong.id, weak.id]
+    assert documents[0]["selection_reason"] == "hybrid"
 
 
 def test_vector_failure_rolls_back_ai_create(wiki_root, tmp_path):

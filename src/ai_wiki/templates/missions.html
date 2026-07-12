@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}{{ t('missions.title') }} - {{ wiki_name }}{% endblock %}
+{% block content %}
+<div class="mission-control">
+  <a class="mission-skip-link" href="#mission-overview-main">{{ t('accessibility.skip_missions') }}</a>
+  <div id="mission-overview-main" tabindex="-1">
+  <header class="mission-masthead">
+    <div>
+      <p class="mission-kicker">{{ t('missions.eyebrow') }}</p>
+      <h1>{{ t('missions.title') }}</h1>
+      <p class="mission-thesis">{{ t('missions.description') }}</p>
+    </div>
+    <div class="mission-ledger-total" aria-label="{{ t('missions.total') }}">
+      <strong>{{ total }}</strong>
+      <span>{{ t('missions.total') }}</span>
+    </div>
+  </header>
+
+  <form class="mission-filters" method="get" action="{{ url_for('missions_view') }}" role="search" aria-label="{{ t('missions.filters') }}">
+    <input type="hidden" name="lang" value="{{ lang }}">
+    <label>
+      <span>{{ t('missions.kind') }}</span>
+      <select name="kind">
+        <option value="">{{ t('missions.all_kinds') }}</option>
+        {% for value in kind_options %}
+        <option value="{{ value }}" {% if selected_kind == value %}selected{% endif %}>{{ label(value) }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      <span>{{ t('missions.status') }}</span>
+      <select name="status">
+        <option value="">{{ t('missions.all_statuses') }}</option>
+        {% for value in status_options %}
+        <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ easy(value) }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="mission-filter-plan">
+      <span>{{ t('missions.plan') }}</span>
+      <input name="plan" value="{{ selected_plan }}" placeholder="plan-id" autocomplete="off">
+    </label>
+    <button type="submit" class="mission-filter-submit">{{ t('missions.apply_filters') }}</button>
+    {% if active_filters %}<a class="mission-filter-reset" href="{{ url_for('missions_view', lang=lang) }}">{{ t('missions.clear_filters') }}</a>{% endif %}
+  </form>
+
+  {% if query_error %}
+  <section class="mission-notice mission-notice-error" role="alert">
+    <h2>{{ t('missions.invalid_filter') }}</h2>
+    <p>{{ t('missions.invalid_filter_help') }}</p>
+    <a href="{{ url_for('missions_view', lang=lang) }}">{{ t('missions.clear_filters') }}</a>
+  </section>
+  {% elif access_error %}
+  <section class="mission-notice mission-notice-error" role="alert">
+    <h2>{{ t('missions.denied') }}</h2>
+    <p>{{ t('missions.denied_help') }}</p>
+  </section>
+  {% elif missions %}
+  <section class="mission-queue-section" aria-labelledby="mission-queue-title">
+    <div class="mission-queue-heading">
+      <div>
+        <p class="mission-kicker">{{ t('missions.review_queue') }}</p>
+        <h2 id="mission-queue-title">{{ t('missions.queue_title') }}</h2>
+      </div>
+      <p>{{ offset + 1 }}–{{ page_end }} / {{ total }}</p>
+    </div>
+
+    <ol class="mission-queue">
+      {% for mission in missions %}
+      {% set summary = mission.summary %}
+      {% set task_counts = summary.task_counts %}
+      {% set criterion_counts = summary.criterion_counts %}
+      <li>
+        <article class="mission-queue-item status-{{ mission.status|replace('_', '-') }}{% if summary.degraded %} is-degraded{% endif %}">
+          <div class="mission-state-marker" aria-hidden="true"></div>
+          <div class="mission-row-main">
+            <div class="mission-row-labels">
+              <span class="mission-kind">{{ label(mission.kind) }}</span>
+              <span class="mission-revision">r{{ mission.revision }}</span>
+              <span class="mission-status"><span aria-hidden="true"></span>{{ easy(mission.status) }}</span>
+            </div>
+            <h3><a href="/missions/{{ mission.id|urlencode }}?revision={{ mission.revision }}&amp;lang={{ lang }}">{{ mission.id }}</a></h3>
+            <p class="mission-objective">{{ summary.objective or t('missions.objective_unavailable') }}</p>
+            <div class="mission-relationship">
+              {% if mission.kind == 'work_run' and mission.plan_id %}
+              <span>{{ t('missions.run_of') }}</span>
+              <a href="/missions/{{ mission.plan_id|urlencode }}?revision={{ summary.plan_revision }}&amp;lang={{ lang }}">{{ mission.plan_id }} · r{{ summary.plan_revision }}</a>
+              {% elif mission.kind == 'work_plan' %}
+              <span>{{ t('missions.linked_runs') }}</span>
+              <strong>{{ summary.linked_run_count }}</strong>
+              {% endif %}
+              {% if summary.approval_status %}
+              <span>{{ t('missions.approval') }}</span><strong>{{ easy(summary.approval_status) }}</strong>
+              {% endif %}
+            </div>
+            {% if summary.degraded %}
+            <p class="mission-row-warning"><strong>{{ t('missions.degraded') }}</strong> {{ t('missions.degraded_help') }}</p>
+            {% endif %}
+          </div>
+
+          <dl class="mission-row-metrics">
+            <div><dt>{{ t('missions.progress') }}</dt><dd>{{ task_counts.completed or 0 }} / {{ task_counts.total or 0 }}</dd></div>
+            <div><dt>{{ t('missions.blocked') }}</dt><dd>{{ task_counts.blocked or 0 }}</dd></div>
+            <div><dt>{{ t('missions.in_review') }}</dt><dd>{{ task_counts.in_review or 0 }}</dd></div>
+            <div><dt>{{ t('missions.criteria') }}</dt><dd>{{ criterion_counts.covered or 0 }} / {{ criterion_counts.total or 0 }}</dd></div>
+            <div><dt>{{ t('missions.evidence') }}</dt><dd>{{ summary.evidence_count or 0 }}</dd></div>
+            <div><dt>{{ t('missions.handoff') }}</dt><dd>{{ t('missions.recorded') if summary.handoff_present else t('missions.not_recorded') }}</dd></div>
+          </dl>
+        </article>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <nav class="mission-pagination" aria-label="{{ t('missions.pagination') }}">
+    {% if previous_url %}<a rel="prev" href="{{ previous_url }}">← {{ t('missions.previous') }}</a>{% else %}<span aria-disabled="true">← {{ t('missions.previous') }}</span>{% endif %}
+    <span>{{ offset + 1 }}–{{ page_end }} / {{ total }}</span>
+    {% if next_url %}<a rel="next" href="{{ next_url }}">{{ t('missions.next') }} →</a>{% else %}<span aria-disabled="true">{{ t('missions.next') }} →</span>{% endif %}
+  </nav>
+  {% else %}
+  <section class="mission-empty">
+    <p class="mission-empty-mark" aria-hidden="true">∅</p>
+    <h2>{{ t('missions.no_results') if active_filters else t('missions.empty') }}</h2>
+    <p>{{ t('missions.no_results_help') if active_filters else t('missions.empty_help') }}</p>
+    {% if active_filters %}<a href="{{ url_for('missions_view', lang=lang) }}">{{ t('missions.clear_filters') }}</a>{% endif %}
+  </section>
+  {% endif %}
+  </div>
+</div>
+{% endblock %}

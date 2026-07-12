@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ t('calibration.title') }} - {{ wiki_name }}{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="eyebrow">{{ t('calibration.eyebrow') }}</p>
+    <h1>{{ t('calibration.title') }}</h1>
+    <p class="page-description">{{ t('calibration.description') }}</p>
+  </div>
+  <span class="quality-badge">{{ easy(status.vector.calibration_status) }}</span>
+</section>
+<section class="metadata-grid calibration-summary">
+  <div><dt>{{ t('calibration.total') }}</dt><dd>{{ status.feedback.total }}</dd></div>
+  <div><dt>{{ t('calibration.eligible') }}</dt><dd>{{ status.feedback.eligible }}</dd></div>
+  <div><dt>{{ t('calibration.positive') }}</dt><dd>{{ status.feedback.positive }}</dd></div>
+  <div><dt>{{ t('calibration.negative') }}</dt><dd>{{ status.feedback.negative }}</dd></div>
+</section>
+<section class="content-section">
+  <h2>{{ t('calibration.runs') }}</h2>
+  {% for run in status.runs %}<div class="task-row"><strong>{{ run.run_id }}</strong><span>{{ easy(run.status) }}</span><span>{{ run.created_at }}</span></div>
+  {% else %}<div class="empty-state">{{ t('calibration.empty') }}</div>{% endfor %}
+</section>
+{% endblock %}

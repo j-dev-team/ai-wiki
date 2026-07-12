@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.0 - 2026-07-12
+
+- Add schema-v3 temporal entities, claims, events, evidence, transitions, lazy v2 views, and time-aware queries.
+- Add a Mission ledger with revision-pinned plans, independent approval, evidence review, transactional leases, resource locks, pause/resume, and knowledge candidates.
+- Add independently labeled calibration runs with holdout gates, scoped promotion, cooldown, and rollback.
+- Add principal, role, namespace, secret-reference, redaction, and authorization-audit policy enforcement.
+- Add read-only Git, HTTP, Google Drive, Notion, and Slack connectors with immutable permission-bearing snapshots.
+- Add plugin backend discovery and explicit degraded-state reporting.
+- Add Mission Control, temporal, and calibration review pages plus optional Argon2id/AES-GCM team mode.
+- Add protocol 1.5 contracts, a shared `AIWikiClient`, a Codex/Gemini Missions skill, and a release privacy gate.
+- Preserve v1 and v2 documents without bulk migration; only temporal writes produce schema v3.
+
 ## 0.6.0 - 2026-07-12
 
 - Replace one-vector-per-document retrieval with deterministic YAML-path chunks and exact chunk citations.

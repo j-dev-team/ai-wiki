@@ -147,6 +147,9 @@ try {
     Invoke-ProcessChecked 'Install release tools' $releasePython @('-m', 'pip', 'install', '--quiet', '--upgrade', 'pip', 'build', 'twine')
     Invoke-ProcessChecked 'Build wheel and source distribution' $releasePython @('-m', 'build')
     Invoke-ProcessChecked 'Validate distributions with twine' $releasePython @('-m', 'twine', 'check', $wheelPath, $sdistPath)
+    Invoke-ProcessChecked 'Reject private data in release archives' $releasePython @(
+        'scripts/privacy_gate.py', $wheelPath, $sdistPath
+    )
 
     if (-not (Test-Path -LiteralPath $wheelPath) -or -not (Test-Path -LiteralPath $sdistPath)) {
         throw "Expected release artifacts were not created: $wheelName, $sdistName"
@@ -167,6 +170,10 @@ try {
         'ai_wiki/runtime.py',
         'ai_wiki/skill_routing.py',
         'ai_wiki/skill_templates/SKILL.md',
+        'ai_wiki/mission_skill_templates/SKILL.md',
+        'ai_wiki/temporal_contracts.py',
+        'ai_wiki/missions.py',
+        'ai_wiki/team_security.py',
         'ai_wiki/static/style.css',
         'ai_wiki/templates/base.html',
         'ai_wiki/variant_presets/law.yaml'

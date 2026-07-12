@@ -27,6 +27,7 @@ from ai_wiki.agent_protocol import (
     build_context,
     canonical_document,
     compact_document,
+    estimate_tokens,
     failure as protocol_failure,
     load_json_input,
     project_fields,
@@ -153,6 +154,22 @@ from ai_wiki.storage import (
 from ai_wiki.utils import generate_id, output_error, output_json
 from ai_wiki.wikilog import append_log, migrate_legacy_log
 from ai_wiki.catalog import rebuild_catalog
+from ai_wiki.policy import PolicyDenied, SecurityPolicy
+
+
+def _authorize(ctx, principal_name: str | None, operation: str, namespace: str):
+    policy = SecurityPolicy(get_wiki_root(), CONFIG_FILENAME)
+    try:
+        principal = policy.resolve(principal_name)
+        policy.authorize(principal, operation, namespace)
+        ctx.obj["index"].record_authorization(principal.id, operation, namespace, True)
+        return policy, principal
+    except PolicyDenied as exc:
+        principal_id = principal_name or os.environ.get("AI_WIKI_PRINCIPAL") or "anonymous"
+        ctx.obj["index"].record_authorization(
+            principal_id, operation, namespace, False, str(exc),
+        )
+        _output_protocol_failure(ProtocolFailure(exc.code, str(exc)))
 
 
 def _output_protocol_failure(exc: ProtocolFailure) -> None:
@@ -214,7 +231,7 @@ def cli(ctx):
     ctx.ensure_object(dict)
     register_custom_types(get_wiki_root() / CONFIG_FILENAME, reset=True)
     # init/destroy commands may run without a wiki, so skip index creation
-    if ctx.invoked_subcommand in ("init", "destroy", "upgrade-skill", "quickstart", "template", "create-template", "variant"):
+    if ctx.invoked_subcommand in ("init", "destroy", "upgrade-skill", "quickstart", "template", "create-template", "variant", "team"):
         return
     ctx.obj["index"] = WikiIndex()
     ctx.call_on_close(ctx.obj["index"].close)
@@ -279,6 +296,18 @@ def _install_skills_for_agents(agents: "list[str]", wiki_name: str, skill_files:
             for src in skill_files:
                 shutil.copy2(src, skill_dir / src.name)
             installed_dirs.append(str(skill_dir))
+        mission_templates = Path(__file__).parent / "mission_skill_templates"
+        if mission_templates.exists():
+            mission_destinations = [path_fn(f"{wiki_name}-missions")]
+            if agent == "gemini":
+                mission_destinations.append(
+                    _LEGACY_AGENT_SKILL_PATHS["gemini"][0](f"{wiki_name}-missions")
+                )
+            for mission_dir in mission_destinations:
+                mission_dir.mkdir(parents=True, exist_ok=True)
+                for src in mission_templates.glob("*.md"):
+                    shutil.copy2(src, mission_dir / src.name)
+                installed_dirs.append(str(mission_dir))
     return installed_dirs
 
 
@@ -928,8 +957,9 @@ def list_articles(ctx, sort, category, limit, offset):
               show_default=True, help="AI document view")
 @click.option("--fields", default=None, help="Comma-separated compact field projections")
 @click.option("--legacy", is_flag=True, help="Return the v0.3 response for compatibility")
+@click.option("--principal", default=None, help="Local security principal")
 @click.pass_context
-def get(ctx, article_id, meta_only, view, fields, legacy):
+def get(ctx, article_id, meta_only, view, fields, legacy, principal):
     """Retrieve a document by ID."""
     idx: WikiIndex = ctx.obj["index"]
     article, path = load_article_with_path(article_id)
@@ -937,6 +967,15 @@ def get(ctx, article_id, meta_only, view, fields, legacy):
         if legacy:
             output_error(msg("not_found", article_id), "not_found")
         _output_protocol_failure(ProtocolFailure("not_found", msg("not_found", article_id)))
+
+    policy, resolved = _authorize(ctx, principal, "read", "knowledge")
+    decision = policy.decide(resolved, "read", "knowledge", canonical_document(article))
+    if decision.effect == "deny":
+        _output_protocol_failure(ProtocolFailure("document_access_denied", decision.reason))
+    if decision.effect == "redact" and (legacy or view == "raw"):
+        _output_protocol_failure(ProtocolFailure(
+            "raw_view_denied", "raw or legacy view would expose redacted fields",
+        ))
 
     idx.log_access("get", article_id=article_id)
     if legacy and meta_only:
@@ -959,29 +998,56 @@ def get(ctx, article_id, meta_only, view, fields, legacy):
         else:
             document, _ = compact_document(article)
             document = project_fields(document, fields)
+        if decision.effect == "redact":
+            from ai_wiki.api import AIWikiClient
+            for pointer in decision.redacted_fields:
+                AIWikiClient._remove_pointer(document, pointer)
         output_json(protocol_success({"document": document}, meta={"view": view}))
     except ProtocolFailure as exc:
         _output_protocol_failure(exc)
 
 
 @cli.command()
-def capabilities():
+@click.option("--principal", default=None, help="Local security principal")
+@click.pass_context
+def capabilities(ctx, principal):
     """Describe the stable AI protocol and available operations."""
+    policy = SecurityPolicy(get_wiki_root(), CONFIG_FILENAME)
+    try:
+        resolved = policy.resolve(principal)
+        security = {"mode": policy.mode, "principal": resolved.id, "roles": sorted(resolved.roles)}
+    except PolicyDenied:
+        security = {"mode": policy.mode, "principal": None, "roles": []}
+    from ai_wiki.mission_contracts import mission_json_schema
+    from ai_wiki.plugins import discover_plugins
+    from ai_wiki.temporal_contracts import temporal_json_schema
     output_json(protocol_success({
         "protocol_version": PROTOCOL_VERSION,
+        "compatible_protocol_versions": ["1.1", "1.2", "1.3", "1.4", "1.5"],
         "commands": {
             "get": {"views": ["compact", "full", "raw"], "default": "compact"},
             "context": {
                 "default_max_tokens": 4000, "default_limit": 8,
                 "retrieval": ["document_fts", "chunk_fts", "chunk_vector", "relations"],
                 "require_vector_supported": True,
+                "scopes": ["default", "knowledge", "missions", "all"],
             },
             "record-use": {"outcomes": ["answered", "insufficient"]},
+            "record-feedback": {"judgments": ["accepted", "rejected", "corrected"]},
             "patch": {"operations": ["test", "add", "replace", "remove"], "if_version_required": True},
             "create": {"document_file": "JSON path or - for stdin"},
+            "temporal": {"views": ["current", "as-of", "known-as-of", "timeline", "why-changed", "disputed"]},
+            "mission": {"kinds": ["research_report", "work_plan", "work_run", "knowledge_candidate"]},
         },
         "content_types": sorted(TYPE_SCHEMAS),
         "schema": document_json_schema(),
+        "contracts": {
+            "temporal": temporal_json_schema(),
+            "mission": mission_json_schema(),
+        },
+        "namespaces": ["knowledge", "plans", "runs", "artifacts", "external_evidence"],
+        "security": security,
+        "plugins": discover_plugins(load=False),
     }))
 
 
@@ -994,16 +1060,54 @@ def capabilities():
 @click.option("--include-unverified", is_flag=True)
 @click.option("--require-vector", is_flag=True,
               help="Fail instead of using keyword-only retrieval when vectors are unavailable.")
+@click.option("--scope", type=click.Choice(["default", "knowledge", "missions", "all"]),
+              default="default", show_default=True)
+@click.option("--principal", default=None, help="Local security principal")
 @click.pass_context
-def context_cmd(ctx, query, max_tokens, limit, category, tags, include_unverified, require_vector):
+def context_cmd(ctx, query, max_tokens, limit, category, tags, include_unverified,
+                require_vector, scope, principal):
     """Build an evidence-linked context package within a token budget."""
     try:
+        namespace = "runs" if scope == "missions" else "knowledge"
+        policy, resolved = _authorize(ctx, principal, "search", namespace)
         envelope = build_context(
             ctx.obj["index"], query, max_tokens=max_tokens, limit=limit,
             category=category, tags=list(tags) or None,
             include_unverified=include_unverified,
             require_vector=require_vector,
         )
+        envelope["meta"]["scope"] = scope
+        allowed_ids = []
+        for item in envelope["data"]["documents"]:
+            article = load_article(item["id"])
+            if article and policy.decide(
+                resolved, "search", "knowledge", canonical_document(article),
+            ).effect != "deny":
+                allowed_ids.append(item["id"])
+        allowed = set(allowed_ids)
+        excluded = len(envelope["data"]["documents"]) - len(allowed_ids)
+        envelope["data"]["documents"] = [
+            item for item in envelope["data"]["documents"] if item["id"] in allowed
+        ]
+        envelope["data"]["citations"] = [
+            item for item in envelope["data"]["citations"] if item.get("document_id") in allowed
+        ]
+        envelope["meta"]["excluded_by_policy"] = excluded
+        envelope["meta"]["budget"]["estimated_tokens"] = estimate_tokens(envelope)
+        ctx.obj["index"].conn.execute(
+            "UPDATE context_sessions SET document_ids=?, citations=?, estimated_tokens=? WHERE context_id=?",
+            (json.dumps(allowed_ids), json.dumps([
+                item["key"] for item in envelope["data"]["citations"]
+            ]), envelope["meta"]["budget"]["estimated_tokens"], envelope["data"]["context_id"]),
+        )
+        ctx.obj["index"].conn.commit()
+        if scope in {"missions", "all"}:
+            from ai_wiki.missions import MissionStore
+            store = MissionStore(get_wiki_root())
+            try:
+                envelope["data"]["missions"] = store.list()
+            finally:
+                store.close()
         output_json(envelope)
     except ProtocolFailure as exc:
         _output_protocol_failure(exc)
@@ -1031,15 +1135,50 @@ def record_use(ctx, context_id, citations, outcome):
         ))
 
 
+@cli.command("record-feedback")
+@click.argument("context_id")
+@click.option("--feedback-file", required=True, help="Feedback JSON file or - for stdin")
+@click.option("--principal", default=None, help="Local security principal")
+@click.pass_context
+def record_feedback(ctx, context_id, feedback_file, principal):
+    """Record independently evidenced retrieval feedback for calibration."""
+    try:
+        feedback = load_json_input(feedback_file)
+        if not isinstance(feedback, dict):
+            raise ProtocolFailure("invalid_feedback", "feedback must be a JSON object")
+        operation = "review" if feedback.get("evidence_type") != "agent" else "read"
+        _, resolved = _authorize(ctx, principal, operation, "knowledge")
+        from ai_wiki.vector import VectorIndex
+        vector = VectorIndex()
+        try:
+            state = vector.state()
+        finally:
+            vector.close()
+        model_scope = ":".join(str(state.get(key, "")) for key in (
+            "embedding_model", "embedding_version", "dimensions", "index_revision",
+        ))
+        result = ctx.obj["index"].record_feedback(
+            context_id, feedback, principal_id=resolved.id,
+            roles=set(resolved.roles), model_scope=model_scope,
+        )
+        output_json(protocol_success(result))
+    except ProtocolFailure as exc:
+        _output_protocol_failure(exc)
+    except ValueError as exc:
+        _output_protocol_failure(ProtocolFailure(str(exc), "Feedback could not be recorded"))
+
+
 @cli.command("patch")
 @click.argument("article_id")
 @click.option("--operations-file", required=True, help="JSON Patch file or - for stdin")
 @click.option("--if-version", required=True, type=int)
 @click.option("--dry-run", is_flag=True)
+@click.option("--principal", default=None, help="Local security principal")
 @click.pass_context
-def patch_article(ctx, article_id, operations_file, if_version, dry_run):
+def patch_article(ctx, article_id, operations_file, if_version, dry_run, principal):
     """Apply a validated RFC 6902 subset with optimistic concurrency."""
     idx: WikiIndex = ctx.obj["index"]
+    policy, _ = _authorize(ctx, principal, "patch", "knowledge")
     article, old_path = load_article_with_path(article_id)
     if not article:
         _output_protocol_failure(ProtocolFailure("not_found", msg("not_found", article_id)))
@@ -1058,6 +1197,7 @@ def patch_article(ctx, article_id, operations_file, if_version, dry_run):
             "at": utc_now_text(), "action": "patched", "fields": changed,
             "note": "AI protocol JSON Patch",
         })
+        policy.validate_secrets(patched)
         updated = Article.from_yaml(patched)
         before_quality = quality_validate(article)
         after_quality = quality_validate(updated)
@@ -1117,11 +1257,13 @@ def patch_article(ctx, article_id, operations_file, if_version, dry_run):
 @click.option("--force", is_flag=True, help="Ignore duplicate warning")
 @click.option("--document-file", default=None, help="AI JSON document file or - for stdin")
 @click.option("--dry-run", is_flag=True, help="Validate without writing (document mode)")
+@click.option("--principal", default=None, help="Local security principal")
 @click.pass_context
 def create(ctx, title, category, tags, confidence, source, related, author,
-           content_file, content_stdin, force, document_file, dry_run):
+           content_file, content_stdin, force, document_file, dry_run, principal):
     """Create a new document. Content must be YAML structured data."""
     idx: WikiIndex = ctx.obj["index"]
+    policy, _ = _authorize(ctx, principal, "create", "knowledge")
 
     if document_file is not None:
         if any([title, category, tags, source, related, content_file, content_stdin, force]):
@@ -1132,6 +1274,7 @@ def create(ctx, title, category, tags, confidence, source, related, author,
             payload = load_json_input(document_file)
             if not isinstance(payload, dict):
                 raise ProtocolFailure("invalid_document", "Document input must be a JSON object")
+            policy.validate_secrets(payload)
             if payload.get("schema_version") == 2:
                 article = Article.from_yaml(payload)
             else:
@@ -1254,6 +1397,7 @@ def create(ctx, title, category, tags, confidence, source, related, author,
         "enrichment_hints": hints[:5],
     })
     article.append_changelog("created", list(article.content_keys()), f"document created (type={content.get('type','')})")
+    policy.validate_secrets(article.to_yaml_dict())
 
     # Quality gate
     report = quality_validate(article)
@@ -1554,9 +1698,712 @@ def migrate_schema(ctx, apply_changes, no_backup):
 
 
 @cli.command("schema-json")
-def schema_json():
-    """Print the canonical schema-v2 JSON Schema."""
-    output_json(document_json_schema())
+@click.option("--contract", default="document", type=click.Choice([
+    "document", "document-v3", "temporal", "mission", "research-report",
+    "work-plan", "work-run", "knowledge-candidate", "security", "calibration-feedback",
+]))
+@click.option("--legacy", is_flag=True, help="Print the bare schema for protocol 1.1 compatibility")
+def schema_json(contract, legacy):
+    """Print a machine-readable AI Wiki contract."""
+    from ai_wiki.api import AIWikiClient
+    with AIWikiClient(get_wiki_root()) as client:
+        schema = client.contract_schema(contract)
+        output_json(schema if legacy else protocol_success({"contract": contract, "schema": schema}))
+
+
+def _mission_store():
+    from ai_wiki.missions import MissionStore
+    return MissionStore(get_wiki_root())
+
+
+def _mission_error(exc: Exception):
+    code = getattr(exc, "code", None) or str(exc).split(":", 1)[0] or "mission_error"
+    _output_protocol_failure(ProtocolFailure(code, str(exc)))
+
+
+@cli.group("mission")
+def mission_group():
+    """Create and inspect Mission source-of-truth documents."""
+
+
+@mission_group.command("create")
+@click.option("--document-file", required=True, help="Mission JSON file or -")
+@click.option("--principal", default=None)
+@click.option("--dry-run", is_flag=True)
+@click.pass_context
+def mission_create(ctx, document_file, principal, dry_run):
+    try:
+        raw = load_json_input(document_file)
+        if not isinstance(raw, dict):
+            raise ValueError("invalid_mission_document")
+        namespace = {"work_plan": "plans", "work_run": "runs"}.get(raw.get("kind"), "artifacts")
+        policy, resolved = _authorize(ctx, principal, "create", namespace)
+        policy.validate_secrets(raw)
+        store = _mission_store()
+        try:
+            document = store.create(raw, dry_run=dry_run)
+        finally:
+            store.close()
+        output_json(protocol_success({"mission": document.model_dump(mode="json"), "dry_run": dry_run}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@mission_group.command("get")
+@click.argument("mission_id")
+@click.option("--revision", type=int, default=None)
+@click.option("--principal", default=None)
+@click.pass_context
+def mission_get(ctx, mission_id, revision, principal):
+    try:
+        _authorize(ctx, principal, "read", "plans")
+        store = _mission_store()
+        try:
+            document = store.get(mission_id, revision)
+        finally:
+            store.close()
+        if document is None:
+            raise ValueError("mission_not_found")
+        output_json(protocol_success({"mission": document.model_dump(mode="json")}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@mission_group.command("list")
+@click.option("--kind", default=None)
+@click.option("--status", default=None)
+@click.option("--principal", default=None)
+@click.pass_context
+def mission_list(ctx, kind, status, principal):
+    try:
+        _authorize(ctx, principal, "read", "plans")
+        store = _mission_store()
+        try:
+            rows = store.list(kind=kind, status=status)
+        finally:
+            store.close()
+        output_json(protocol_success({"count": len(rows), "missions": rows}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@mission_group.command("patch")
+@click.argument("mission_id")
+@click.option("--operations-file", required=True)
+@click.option("--if-revision", required=True, type=int)
+@click.option("--principal", default=None)
+@click.option("--dry-run", is_flag=True)
+@click.pass_context
+def mission_patch(ctx, mission_id, operations_file, if_revision, principal, dry_run):
+    try:
+        operations = load_json_input(operations_file)
+        _, resolved = _authorize(ctx, principal, "patch", "plans")
+        store = _mission_store()
+        try:
+            document = store.patch(
+                mission_id, operations, if_revision=if_revision, actor=resolved.id,
+                roles=set(resolved.roles), dry_run=dry_run,
+            )
+        finally:
+            store.close()
+        output_json(protocol_success({"mission": document.model_dump(mode="json"), "dry_run": dry_run}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@mission_group.command("promote")
+@click.argument("candidate_id")
+@click.option("--principal", required=True)
+@click.option("--if-revision", required=True, type=int)
+@click.option("--dry-run", is_flag=True)
+@click.pass_context
+def mission_promote(ctx, candidate_id, principal, if_revision, dry_run):
+    """Promote an approved, evidence-backed KnowledgeCandidate into this wiki root."""
+    try:
+        _, resolved = _authorize(ctx, principal, "approve", "artifacts")
+        store = _mission_store()
+        try:
+            candidate = store.get(candidate_id)
+            if candidate is None or candidate.kind != "knowledge_candidate":
+                raise ValueError("knowledge_candidate_not_found")
+            if candidate.status != "approved" and candidate.payload.get("verification_status") != "approved":
+                raise ValueError("knowledge_candidate_not_approved")
+            raw_text = json.dumps(candidate.payload, ensure_ascii=False)
+            blocked_patterns = [r"\b\d{6}-?[1-4]\d{6}\b", r"(?i)password\s*[:=]", r"(?i)api[_-]?key\s*[:=]"]
+            if any(re.search(pattern, raw_text) for pattern in blocked_patterns):
+                raise ValueError("sensitive_candidate_blocked")
+            from ai_wiki.api import AIWikiClient
+            with AIWikiClient(get_wiki_root(), principal=resolved.id) as client:
+                if candidate.payload["action"] == "create":
+                    result = client.create(candidate.payload["proposed_document"], dry_run=dry_run)
+                else:
+                    target = candidate.payload["target_document_id"]
+                    current = client.get(target)["data"]["document"]["version"]
+                    result = client.patch(
+                        target, candidate.payload["proposed_operations"],
+                        if_version=current, dry_run=dry_run,
+                    )
+            if not dry_run:
+                operations = [
+                    {"op": "replace", "path": "/status", "value": "promoted"},
+                    {"op": "replace", "path": "/payload/verification_status", "value": "promoted"},
+                ]
+                store.patch(candidate_id, operations, if_revision=if_revision,
+                            actor=resolved.id, roles=set(resolved.roles))
+        finally:
+            store.close()
+        output_json(protocol_success({"candidate_id": candidate_id, "dry_run": dry_run,
+                                     "promotion": result["data"]}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@cli.group("plan")
+def plan_group():
+    """Approve and revise WorkPlans."""
+
+
+@plan_group.command("approve")
+@click.argument("plan_id")
+@click.option("--if-revision", required=True, type=int)
+@click.option("--principal", required=True)
+@click.option("--note", default="")
+@click.pass_context
+def plan_approve(ctx, plan_id, if_revision, principal, note):
+    try:
+        _, resolved = _authorize(ctx, principal, "approve", "plans")
+        from ai_wiki.missions import utc_text
+        operations = [
+            {"op": "replace", "path": "/status", "value": "approved"},
+            {"op": "replace", "path": "/payload/approval/status", "value": "approved"},
+            {"op": "replace", "path": "/payload/approval/decided_by", "value": resolved.id},
+            {"op": "replace", "path": "/payload/approval/decided_at", "value": utc_text()},
+            {"op": "replace", "path": "/payload/approval/note", "value": note},
+        ]
+        store = _mission_store()
+        try:
+            before = store.get(plan_id)
+            if before and before.metadata.created_by == resolved.id and "owner" not in resolved.roles:
+                raise ValueError("self_approval_denied")
+            document = store.patch(plan_id, operations, if_revision=if_revision,
+                                   actor=resolved.id, roles=set(resolved.roles))
+        finally:
+            store.close()
+        output_json(protocol_success({"mission": document.model_dump(mode="json")}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@plan_group.command("get")
+@click.argument("plan_id")
+@click.option("--revision", type=int, default=None)
+@click.option("--principal", default=None)
+@click.pass_context
+def plan_get(ctx, plan_id, revision, principal):
+    try:
+        _authorize(ctx, principal, "read", "plans")
+        store = _mission_store()
+        try:
+            document = store.get(plan_id, revision)
+        finally:
+            store.close()
+        if document is None or document.kind != "work_plan":
+            raise ValueError("plan_not_found")
+        output_json(protocol_success({"mission": document.model_dump(mode="json")}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@plan_group.command("reject")
+@click.argument("plan_id")
+@click.option("--if-revision", required=True, type=int)
+@click.option("--principal", required=True)
+@click.option("--reason", required=True)
+@click.pass_context
+def plan_reject(ctx, plan_id, if_revision, principal, reason):
+    try:
+        _, resolved = _authorize(ctx, principal, "approve", "plans")
+        from ai_wiki.missions import utc_text
+        operations = [
+            {"op": "replace", "path": "/status", "value": "draft"},
+            {"op": "replace", "path": "/payload/approval/status", "value": "rejected"},
+            {"op": "replace", "path": "/payload/approval/decided_by", "value": resolved.id},
+            {"op": "replace", "path": "/payload/approval/decided_at", "value": utc_text()},
+            {"op": "replace", "path": "/payload/approval/note", "value": reason},
+        ]
+        store = _mission_store()
+        try:
+            document = store.patch(plan_id, operations, if_revision=if_revision,
+                                   actor=resolved.id, roles=set(resolved.roles))
+        finally:
+            store.close()
+        output_json(protocol_success({"mission": document.model_dump(mode="json")}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@cli.group("run")
+def run_group():
+    """Start and inspect WorkRuns executed by external agents."""
+
+
+@run_group.command("start")
+@click.argument("plan_id")
+@click.option("--run-id", default=None)
+@click.option("--principal", required=True)
+@click.option("--dry-run", is_flag=True)
+@click.pass_context
+def run_start(ctx, plan_id, run_id, principal, dry_run):
+    try:
+        _, resolved = _authorize(ctx, principal, "create", "runs")
+        store = _mission_store()
+        try:
+            document = store.start_run(plan_id, actor=resolved.id, run_id=run_id, dry_run=dry_run)
+        finally:
+            store.close()
+        output_json(protocol_success({"mission": document.model_dump(mode="json"), "dry_run": dry_run}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@run_group.command("status")
+@click.argument("run_id")
+@click.option("--principal", default=None)
+@click.pass_context
+def run_status(ctx, run_id, principal):
+    try:
+        _authorize(ctx, principal, "read", "runs")
+        store = _mission_store()
+        try:
+            document = store.get(run_id)
+            ready = store.ready_tasks(run_id) if document else []
+        finally:
+            store.close()
+        if document is None:
+            raise ValueError("run_not_found")
+        output_json(protocol_success({"mission": document.model_dump(mode="json"), "ready_tasks": ready}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+def _run_transition(ctx, run_id, principal, if_revision, status, reason):
+    operation = "complete" if status in {"completed", "failed"} else "patch"
+    _, resolved = _authorize(ctx, principal, operation, "runs")
+    store = _mission_store()
+    try:
+        run = store.get(run_id)
+        if run is None or run.kind != "work_run":
+            raise ValueError("run_not_found")
+        if status == "completed":
+            states = [item["status"] for item in run.payload["task_states"]]
+            if any(item not in {"completed", "skipped", "cancelled"} for item in states):
+                raise ValueError("run_has_incomplete_tasks")
+        operations = [{"op": "replace", "path": "/status", "value": status}]
+        if status == "completed":
+            from ai_wiki.missions import utc_text
+            operations.append({"op": "replace", "path": "/payload/completed_at", "value": utc_text()})
+        if reason:
+            operations.append({"op": "replace", "path": "/payload/handoff", "value": {
+                "reason": reason, "recorded_by": resolved.id,
+            }})
+        return store.patch(run_id, operations, if_revision=if_revision,
+                           actor=resolved.id, roles=set(resolved.roles))
+    finally:
+        store.close()
+
+
+for _name, _status in (("pause", "paused"), ("resume", "running"), ("cancel", "cancelled"),
+                       ("submit-review", "in_review"), ("complete", "completed"), ("fail", "failed")):
+    def _make_run_transition(name, status):
+        @run_group.command(name)
+        @click.argument("run_id")
+        @click.option("--if-revision", required=True, type=int)
+        @click.option("--principal", required=True)
+        @click.option("--reason", required=True)
+        @click.pass_context
+        def command(ctx, run_id, if_revision, principal, reason):
+            try:
+                document = _run_transition(ctx, run_id, principal, if_revision, status, reason)
+                output_json(protocol_success({"mission": document.model_dump(mode="json")}))
+            except Exception as exc:
+                _mission_error(exc)
+        return command
+    _make_run_transition(_name, _status)
+
+
+@cli.group("task")
+def task_group():
+    """Claim, heartbeat, submit, and review Mission tasks."""
+
+
+@task_group.command("ready")
+@click.argument("run_id")
+@click.option("--principal", default=None)
+@click.pass_context
+def task_ready(ctx, run_id, principal):
+    try:
+        _authorize(ctx, principal, "read", "runs")
+        store = _mission_store()
+        try:
+            ready = store.ready_tasks(run_id)
+        finally:
+            store.close()
+        output_json(protocol_success({"run_id": run_id, "ready_tasks": ready}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@task_group.command("claim")
+@click.argument("run_id")
+@click.argument("task_id")
+@click.option("--principal", required=True)
+@click.option("--ttl", default=900, type=int)
+@click.option("--if-revision", required=True, type=int)
+@click.pass_context
+def task_claim(ctx, run_id, task_id, principal, ttl, if_revision):
+    try:
+        _, resolved = _authorize(ctx, principal, "patch", "runs")
+        store = _mission_store()
+        try:
+            lease = store.claim(run_id, task_id, owner=resolved.id, ttl_seconds=ttl)
+            run = store.get(run_id)
+            task_index = next(
+                index for index, item in enumerate(run.payload["task_states"])
+                if item["task_id"] == task_id
+            )
+            operations = [
+                {"op": "replace", "path": f"/payload/task_states/{task_index}/status", "value": "in_progress"},
+                {"op": "replace", "path": f"/payload/task_states/{task_index}/assigned_to", "value": resolved.id},
+                {"op": "replace", "path": f"/payload/task_states/{task_index}/attempt",
+                 "value": int(run.payload["task_states"][task_index].get("attempt", 0)) + 1},
+            ]
+            if run.status == "created":
+                operations.append({"op": "replace", "path": "/status", "value": "running"})
+            try:
+                updated = store.patch(
+                    run_id, operations, if_revision=if_revision, actor=resolved.id,
+                    roles=set(resolved.roles),
+                )
+            except Exception:
+                store.release(run_id, task_id, owner=resolved.id)
+                raise
+        finally:
+            store.close()
+        output_json(protocol_success({"lease": lease, "revision": updated.revision}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@task_group.command("heartbeat")
+@click.argument("run_id")
+@click.argument("task_id")
+@click.option("--principal", required=True)
+@click.option("--ttl", default=900, type=int)
+@click.pass_context
+def task_heartbeat(ctx, run_id, task_id, principal, ttl):
+    try:
+        _, resolved = _authorize(ctx, principal, "patch", "runs")
+        store = _mission_store()
+        try:
+            lease = store.heartbeat(run_id, task_id, owner=resolved.id, ttl_seconds=ttl)
+        finally:
+            store.close()
+        output_json(protocol_success({"lease": lease}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@task_group.command("submit")
+@click.argument("run_id")
+@click.argument("task_id")
+@click.option("--evidence-file", required=True)
+@click.option("--result", required=True)
+@click.option("--principal", required=True)
+@click.option("--if-revision", required=True, type=int)
+@click.pass_context
+def task_submit(ctx, run_id, task_id, evidence_file, result, principal, if_revision):
+    try:
+        _, resolved = _authorize(ctx, principal, "submit", "runs")
+        raw_evidence = load_json_input(evidence_file)
+        evidence_items = raw_evidence if isinstance(raw_evidence, list) else [raw_evidence]
+        from ai_wiki.mission_contracts import MissionEvidence
+        evidence = [MissionEvidence.model_validate(item, strict=True) for item in evidence_items]
+        store = _mission_store()
+        try:
+            run = store.get(run_id)
+            task_index = next(
+                index for index, item in enumerate(run.payload["task_states"])
+                if item["task_id"] == task_id
+            )
+            operations = [
+                *[{"op": "add", "path": "/evidence/-", "value": item.model_dump(mode="json")}
+                  for item in evidence],
+                {"op": "replace", "path": f"/payload/task_states/{task_index}/status", "value": "in_review"},
+                {"op": "replace", "path": f"/payload/task_states/{task_index}/result", "value": result},
+                {"op": "replace", "path": f"/payload/task_states/{task_index}/evidence_ids",
+                 "value": [item.evidence_id for item in evidence]},
+            ]
+            updated = store.patch(
+                run_id, operations, if_revision=if_revision, actor=resolved.id,
+                roles=set(resolved.roles),
+            )
+            store.release(run_id, task_id, owner=resolved.id)
+        finally:
+            store.close()
+        output_json(protocol_success({"run_id": run_id, "task_id": task_id,
+                                     "revision": updated.revision, "status": "in_review"}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@task_group.command("verify")
+@click.argument("run_id")
+@click.argument("task_id")
+@click.option("--decision", required=True, type=click.Choice(["completed", "failed", "in_progress"]))
+@click.option("--reason", required=True)
+@click.option("--principal", required=True)
+@click.option("--if-revision", required=True, type=int)
+@click.pass_context
+def task_verify(ctx, run_id, task_id, decision, reason, principal, if_revision):
+    try:
+        _, resolved = _authorize(ctx, principal, "complete", "runs")
+        store = _mission_store()
+        try:
+            run = store.get(run_id)
+            task_index = next(
+                index for index, item in enumerate(run.payload["task_states"])
+                if item["task_id"] == task_id
+            )
+            operations = [
+                {"op": "replace", "path": f"/payload/task_states/{task_index}/status", "value": decision},
+                {"op": "replace", "path": f"/payload/task_states/{task_index}/result", "value": reason},
+            ]
+            updated = store.patch(
+                run_id, operations, if_revision=if_revision, actor=resolved.id,
+                roles=set(resolved.roles),
+            )
+        finally:
+            store.close()
+        output_json(protocol_success({"run_id": run_id, "task_id": task_id,
+                                     "revision": updated.revision, "status": decision}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+def _task_transition(ctx, run_id, task_id, principal, if_revision, status, reason, operation):
+    _, resolved = _authorize(ctx, principal, operation, "runs")
+    store = _mission_store()
+    try:
+        run = store.get(run_id)
+        if run is None:
+            raise ValueError("run_not_found")
+        task_index = next(
+            index for index, item in enumerate(run.payload["task_states"])
+            if item["task_id"] == task_id
+        )
+        operations = [
+            {"op": "replace", "path": f"/payload/task_states/{task_index}/status", "value": status},
+            {"op": "replace", "path": f"/payload/task_states/{task_index}/result", "value": reason},
+        ]
+        return store.patch(run_id, operations, if_revision=if_revision, actor=resolved.id,
+                           roles=set(resolved.roles))
+    finally:
+        store.close()
+
+
+for _name, _status, _operation in (
+    ("block", "blocked", "submit"), ("skip", "skipped", "submit"),
+    ("reopen", "ready", "complete"),
+):
+    def _make_task_transition(name, status, operation):
+        @task_group.command(name)
+        @click.argument("run_id")
+        @click.argument("task_id")
+        @click.option("--if-revision", required=True, type=int)
+        @click.option("--principal", required=True)
+        @click.option("--reason", required=True)
+        @click.pass_context
+        def command(ctx, run_id, task_id, if_revision, principal, reason):
+            try:
+                document = _task_transition(
+                    ctx, run_id, task_id, principal, if_revision, status, reason, operation,
+                )
+                output_json(protocol_success({"mission": document.model_dump(mode="json")}))
+            except Exception as exc:
+                _mission_error(exc)
+        return command
+    _make_task_transition(_name, _status, _operation)
+
+
+@cli.group("temporal")
+def temporal_group():
+    """Query temporal claims and transitions."""
+
+
+def _temporal_output(ctx, view, identifier, at=None):
+    from ai_wiki.temporal import TemporalQueries
+    query = TemporalQueries(ctx.obj["index"])
+    if view == "current": result = query.current(identifier, at)
+    elif view == "as-of": result = query.as_of(identifier, at)
+    elif view == "known-as-of": result = query.known_as_of(identifier, at)
+    elif view == "timeline": result = query.timeline(identifier)
+    elif view == "disputed": result = query.disputed(identifier)
+    else: result = query.why_changed(identifier)
+    output_json(protocol_success({"view": view, "id": identifier, "result": result}))
+
+
+for _view in ("current", "as-of", "known-as-of", "timeline", "why-changed", "disputed"):
+    def _make(view):
+        @temporal_group.command(view)
+        @click.argument("identifier")
+        @click.option("--at", default=None, required=view in {"as-of", "known-as-of"})
+        @click.pass_context
+        def command(ctx, identifier, at):
+            try: _temporal_output(ctx, view, identifier, at)
+            except Exception as exc: _mission_error(exc)
+        return command
+    _make(_view)
+
+
+@cli.group("calibration")
+def calibration_group():
+    """Manage candidate semantic score calibration."""
+
+
+def _calibration_manager(ctx):
+    from ai_wiki.calibration import CalibrationManager
+    from ai_wiki.vector import VectorIndex
+    vector = VectorIndex()
+    return CalibrationManager(ctx.obj["index"], vector), vector
+
+
+@calibration_group.command("status")
+@click.pass_context
+def calibration_status(ctx):
+    manager, vector = _calibration_manager(ctx)
+    try: output_json(protocol_success(manager.status()))
+    finally: vector.close()
+
+
+@calibration_group.command("run")
+@click.option("--dry-run", is_flag=True)
+@click.option("--allow-small-eval", is_flag=True, hidden=True)
+@click.pass_context
+def calibration_run(ctx, dry_run, allow_small_eval):
+    manager, vector = _calibration_manager(ctx)
+    try:
+        thresholds = ({"minimum_labeled_samples": 20, "minimum_positive_samples": 10,
+                       "minimum_negative_samples": 10, "minimum_distinct_documents": 1}
+                      if allow_small_eval else None)
+        output_json(protocol_success(manager.run(dry_run=dry_run, thresholds=thresholds)))
+    except Exception as exc: _mission_error(exc)
+    finally: vector.close()
+
+
+@calibration_group.command("promote")
+@click.argument("run_id")
+@click.pass_context
+def calibration_promote(ctx, run_id):
+    manager, vector = _calibration_manager(ctx)
+    try: output_json(protocol_success(manager.promote(run_id)))
+    except Exception as exc: _mission_error(exc)
+    finally: vector.close()
+
+
+@calibration_group.command("rollback")
+@click.argument("run_id")
+@click.pass_context
+def calibration_rollback(ctx, run_id):
+    manager, vector = _calibration_manager(ctx)
+    try: output_json(protocol_success(manager.rollback(run_id)))
+    except Exception as exc: _mission_error(exc)
+    finally: vector.close()
+
+
+@cli.group("team")
+def team_group():
+    """Administer optional authenticated team mode from the local machine."""
+
+
+@team_group.command("user-add")
+@click.argument("user_id")
+@click.option("--role", "roles", multiple=True,
+              type=click.Choice(["owner", "reviewer", "agent", "reader"]), required=True)
+@click.password_option(confirmation_prompt=True)
+def team_user_add(user_id, roles, password):
+    from ai_wiki.team_security import TeamSecurity
+    security = TeamSecurity(get_wiki_root())
+    try:
+        security.create_user(user_id, password, list(roles))
+    finally:
+        security.close()
+    output_json({"status": "ok", "user_id": user_id, "roles": list(roles)})
+
+
+@team_group.command("token-issue")
+@click.argument("user_id")
+@click.option("--label", required=True)
+@click.option("--days", default=30, type=click.IntRange(1, 365))
+def team_token_issue(user_id, label, days):
+    from ai_wiki.team_security import TeamSecurity
+    security = TeamSecurity(get_wiki_root())
+    try:
+        token = security.issue_token(user_id, label, days)
+    finally:
+        security.close()
+    output_json({
+        "status": "ok", "user_id": user_id, "label": label, "expires_in_days": days,
+        "token": token, "notice": "This token is shown once; store it in a secret manager.",
+    })
+
+
+@cli.group("connector")
+def connector_group():
+    """Manage read-only external source connectors."""
+
+
+@connector_group.command("add")
+@click.argument("name")
+@click.option("--type", "connector_type", required=True,
+              type=click.Choice(["git", "web", "google-drive", "notion", "slack"]))
+@click.option("--config-file", required=True)
+def connector_add(name, connector_type, config_file):
+    from ai_wiki.connectors import ConnectorManager
+    config = load_json_input(config_file)
+    try: output_json(protocol_success(ConnectorManager(get_wiki_root()).add(name, connector_type, config)))
+    except Exception as exc: _mission_error(exc)
+
+
+@connector_group.command("list")
+def connector_list():
+    from ai_wiki.connectors import ConnectorManager
+    rows = ConnectorManager(get_wiki_root()).list()
+    output_json(protocol_success({"count": len(rows), "connectors": rows}))
+
+
+@connector_group.command("sync")
+@click.argument("name")
+def connector_sync(name):
+    from ai_wiki.connectors import ConnectorManager
+    try: output_json(protocol_success(ConnectorManager(get_wiki_root()).sync(name)))
+    except Exception as exc: _mission_error(exc)
+
+
+@connector_group.command("status")
+@click.argument("name")
+def connector_status(name):
+    from ai_wiki.connectors import ConnectorManager
+    try: output_json(protocol_success(ConnectorManager(get_wiki_root()).status(name)))
+    except Exception as exc: _mission_error(exc)
+
+
+@connector_group.command("remove")
+@click.argument("name")
+@click.option("--confirm", is_flag=True, required=True)
+def connector_remove(name, confirm):
+    from ai_wiki.connectors import ConnectorManager
+    try: output_json(protocol_success(ConnectorManager(get_wiki_root()).remove(name)))
+    except Exception as exc: _mission_error(exc)
 
 
 @cli.command()
@@ -2274,21 +3121,34 @@ def doctor(ctx, load_model):
     idx: WikiIndex = ctx.obj["index"]
     article_count = idx.count()
     chunk_documents = idx.chunk_document_count()
+    fts_integrity = idx.fts_integrity()
+    chunk_ready = article_count == chunk_documents and fts_integrity["ready"]
+    chunk_actions = []
+    if article_count != chunk_documents:
+        chunk_actions.append(f"Rebuild keyword chunk index: {COMMAND_NAME} reindex")
+    if not fts_integrity["ready"]:
+        chunk_actions.append(f"Repair damaged FTS index: {COMMAND_NAME} reindex")
     chunk_status = {
-        "ready": article_count == chunk_documents,
+        "ready": chunk_ready,
         "document_count": chunk_documents,
         "chunk_count": idx.chunk_count(),
         "article_count": article_count,
-        "actions": [] if article_count == chunk_documents else [
-            f"Rebuild keyword chunk index: {COMMAND_NAME} reindex"
-        ],
+        "fts_integrity": fts_integrity,
+        "actions": list(dict.fromkeys(chunk_actions)),
     }
+    from ai_wiki.plugins import discover_plugins
+    plugins = discover_plugins(load=True)
+    plugin_degraded = [
+        item for group in plugins.values() for item in group if item["status"] == "degraded"
+    ]
     output_json({
         "status": "ok",
         "wiki_root": str(get_wiki_root()),
         "article_count": article_count,
         "chunk_index": chunk_status,
         "vector": _vector_status(idx=idx, load_model=load_model),
+        "plugins": {"ready": not plugin_degraded, "backends": plugins,
+                    "degraded": plugin_degraded},
     })
 
 
@@ -2562,6 +3422,18 @@ def maintain(ctx, fix):
     priority_order = {"high": 0, "medium": 1, "low": 2}
     tasks.sort(key=lambda t: priority_order.get(t["priority"], 9))
     result["todo"] = {"count": len(tasks), "top": tasks[:5]}
+
+    vector_index = None
+    try:
+        from ai_wiki.calibration import CalibrationManager
+        from ai_wiki.vector import VectorIndex
+        vector_index = VectorIndex()
+        result["calibration"] = CalibrationManager(idx, vector_index).maintain()
+    except Exception as exc:
+        result["calibration"] = {"status": "degraded", "error": str(exc)}
+    finally:
+        if vector_index is not None:
+            vector_index.close()
 
     result["total_articles"] = len(articles)
     append_log("maintain", details=f"articles={len(articles)} fixes={len(fixes)}")
@@ -3130,12 +4002,13 @@ def destroy(ctx, path, confirm):
                 _LEGACY_AGENT_SKILL_PATHS.get(_agent, ())
             )
             for _candidate_fn in _path_fns:
-                _skill_dir = _candidate_fn(wiki_name)
-                if _skill_dir.exists():
-                    try:
-                        shutil.rmtree(_skill_dir)
-                    except Exception as _e:
-                        logger.warning("Could not remove %s skill dir: %s", _agent, _e)
+                for _skill_name in (wiki_name, f"{wiki_name}-missions"):
+                    _skill_dir = _candidate_fn(_skill_name)
+                    if _skill_dir.exists():
+                        try:
+                            shutil.rmtree(_skill_dir)
+                        except Exception as _e:
+                            logger.warning("Could not remove %s skill dir: %s", _agent, _e)
 
     # 8. Remove the entire wiki directory
     try:
@@ -3154,7 +4027,10 @@ def destroy(ctx, path, confirm):
 # ── upgrade-skill ─────────────────────────────────────────────────
 
 @cli.command("upgrade-skill")
-def upgrade_skill():
+@click.option("--agent", "requested_agents", multiple=True,
+              type=click.Choice(["claude", "gemini", "codex"]),
+              help="Explicit agent target; may be repeated")
+def upgrade_skill(requested_agents):
     """Install the latest skill files bundled with the package to each agent-specific path.
     
     Reads the agents list from .ai-wiki.yaml and updates only the relevant agent paths.
@@ -3176,7 +4052,7 @@ def upgrade_skill():
     # Read wiki name and agents from .ai-wiki.yaml
     wiki_root_env = _os.environ.get(ROOT_ENV_NAME, _os.environ.get("AI_WIKI_ROOT", "."))
     wiki_root = Path(wiki_root_env).resolve()
-    wiki_name = wiki_root.name
+    wiki_name = SKILL_NAME
     _cfg_path = wiki_root / CONFIG_FILENAME
     if _cfg_path.exists():
         try:
@@ -3186,7 +4062,7 @@ def upgrade_skill():
             wiki_name = _cfg.get("name") or wiki_name
         except Exception:
             pass
-    agents = _load_agents_from_config(wiki_root)
+    agents = list(dict.fromkeys(requested_agents)) or _load_agents_from_config(wiki_root)
 
     # Version check
     pkg_ver = _get_package_skill_version()
@@ -3223,6 +4099,23 @@ def upgrade_skill():
             click.echo(msg("upgrade_skill_copied", len(copied), dest_dir, label))
             for fname in sorted(copied):
                 click.echo(msg("upgrade_skill_file_ok", fname))
+        mission_templates = Path(__file__).parent / "mission_skill_templates"
+        if mission_templates.exists():
+            mission_destinations = [path_fn(f"{wiki_name}-missions")]
+            if agent == "gemini":
+                mission_destinations.append(
+                    _LEGACY_AGENT_SKILL_PATHS["gemini"][0](f"{wiki_name}-missions")
+                )
+            for mission_dir in mission_destinations:
+                mission_dir.mkdir(parents=True, exist_ok=True)
+                copied = []
+                for src in mission_templates.glob("*.md"):
+                    shutil.copy2(src, mission_dir / src.name)
+                    copied.append(src.name)
+                label = _AGENT_DISPLAY.get(agent, agent)
+                click.echo(msg("upgrade_skill_copied", len(copied), mission_dir, label))
+                for fname in sorted(copied):
+                    click.echo(msg("upgrade_skill_file_ok", fname))
 
     version_str = pkg_ver or "unknown"
     click.echo(msg("upgrade_skill_done", version_str))

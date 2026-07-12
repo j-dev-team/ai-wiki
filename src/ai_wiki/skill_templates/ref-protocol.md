@@ -3,7 +3,7 @@
 All primary agent commands return the same envelope:
 
 ```json
-{"protocol_version":"1.1","status":"ok","data":{},"meta":{},"error":null}
+{"protocol_version":"1.5","status":"ok","data":{},"meta":{},"error":null}
 ```
 
 Errors use `status=error` and a stable `error.code`. Agents must branch on the

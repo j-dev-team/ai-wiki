@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ t('temporal.eyebrow') }} - {{ article_id }}{% endblock %}
+{% block content %}
+<section class="page-header"><div><p class="eyebrow">{{ t('temporal.eyebrow') }}</p><h1>{{ article_id }}</h1></div></section>
+<section class="content-section">
+  <h2>{{ t('temporal.current') }}</h2>
+  {% for claim in current %}<div class="fact-row"><strong>{{ label(claim.predicate) }}</strong><span>{{ easy(claim.object) }}</span><small>{{ claim.valid_from or '-' }}</small></div>
+  {% else %}<div class="empty-state">{{ t('temporal.empty_claims') }}</div>{% endfor %}
+</section>
+<section class="content-section">
+  <h2>{{ t('temporal.timeline') }}</h2>
+  {% for item in timeline %}<div class="timeline-item"><time>{{ item.at }}</time><strong>{{ label(item.kind) }}</strong><pre>{{ item.data|tojson(indent=2) }}</pre></div>
+  {% else %}<div class="empty-state">{{ t('temporal.empty_timeline') }}</div>{% endfor %}
+</section>
+{% if disputed %}<section class="content-section"><h2>{{ t('temporal.disputed') }}</h2><pre>{{ disputed|tojson(indent=2) }}</pre></section>{% endif %}
+{% if conflicts %}<section class="content-section"><h2>{{ t('temporal.conflicts') }}</h2><pre>{{ conflicts|tojson(indent=2) }}</pre></section>{% endif %}
+{% endblock %}

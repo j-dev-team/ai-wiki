@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Team sign in - {{ wiki_name }}{% endblock %}
+{% block content %}
+<main class="auth-shell">
+  <form method="post" class="auth-panel">
+    <p class="eyebrow">Team mode</p>
+    <h1>Sign in</h1>
+    {% if error %}<p class="form-error">{{ error }}</p>{% endif %}
+    <label>User ID<input name="user_id" autocomplete="username" required></label>
+    <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
+    <button type="submit" class="btn btn-primary">Sign in</button>
+  </form>
+</main>
+{% endblock %}

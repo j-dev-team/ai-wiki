@@ -38,6 +38,9 @@ class SourceRecord(BaseModel):
     url: str = Field(pattern=r"^https?://[^\s/]+(?:/[^\s]*)?$")
     title: str = ""
     retrieved_at: datetime | None = None
+    revision: str | None = None
+    content_hash: str | None = Field(default=None, pattern=r"^[a-fA-F0-9]{64}$")
+    permissions: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("url")
     @classmethod
@@ -205,6 +208,23 @@ class WikiDocumentV2(BaseModel):
             unknown = set(record.source_ids) - source_ids
             if unknown:
                 raise ValueError(f"unknown source IDs referenced: {sorted(unknown)}")
+        temporal = self.extensions.get("temporal")
+        if temporal is not None:
+            from ai_wiki.temporal_contracts import TemporalExtension
+            parsed_temporal = TemporalExtension.model_validate(temporal, strict=True)
+            source_hashes = {source.id: source.content_hash for source in self.sources}
+            for evidence in parsed_temporal.evidence:
+                expected = source_hashes.get(evidence.source_id)
+                if expected and evidence.content_hash and expected.casefold() != evidence.content_hash.casefold():
+                    raise ValueError(f"temporal evidence content hash mismatch: {evidence.id}")
+            validated = TemporalExtension.model_validate(temporal, strict=True)
+            temporal_source_ids = {item.source_id for item in validated.evidence}
+            unknown_temporal_sources = temporal_source_ids - source_ids
+            if unknown_temporal_sources:
+                raise ValueError(
+                    f"unknown temporal source IDs referenced: {sorted(unknown_temporal_sources)}"
+                )
+            self.extensions["temporal"] = validated.model_dump(mode="python")
         return self
 
 
@@ -223,4 +243,6 @@ def document_json_schema() -> dict[str, Any]:
     if isinstance(type_property, dict):
         type_property["enum"] = sorted(TYPE_SCHEMAS)
     schema["x-ai-wiki-content-types"] = copy.deepcopy(TYPE_SCHEMAS)
+    from ai_wiki.temporal_contracts import temporal_json_schema
+    schema["x-ai-wiki-temporal-extension"] = temporal_json_schema()
     return schema

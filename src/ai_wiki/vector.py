@@ -4,6 +4,7 @@ from __future__ import annotations
 import sqlite3
 import struct
 import math
+import json
 import os
 import uuid
 from datetime import datetime, timezone
@@ -392,9 +393,10 @@ class VectorIndex:
         value = max(-60.0, min(60.0, a * similarity + b))
         return round(1.0 / (1.0 + math.exp(-value)), 6)
 
-    def calibrate(self, samples: list[tuple[float, int]], *, iterations: int = 2000,
-                  learning_rate: float = 0.05) -> dict:
-        """Fit Platt-style logistic calibration from labeled corpus retrieval scores."""
+    @staticmethod
+    def fit_calibration(samples: list[tuple[float, int]], *, iterations: int = 2000,
+                        learning_rate: float = 0.05) -> tuple[float, float]:
+        """Fit Platt-style logistic parameters without mutating an index."""
         if len(samples) < 20 or {label for _, label in samples} != {0, 1}:
             raise ValueError("calibration requires at least 20 positive and negative labeled samples")
         positives = sum(label for _, label in samples)
@@ -414,25 +416,46 @@ class VectorIndex:
                 grad_b += error
             a -= learning_rate * grad_a / len(samples)
             b -= learning_rate * grad_b / len(samples)
+        return a, b
+
+    def install_calibration(self, a: float, b: float, *, samples: int,
+                            run_id: str | None = None) -> dict:
         now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         revision_row = self.conn.execute(
             "SELECT value FROM vector_state WHERE key = 'index_revision'"
         ).fetchone()
         revision = revision_row[0] if revision_row else "0"
-        self.conn.executemany(
-            "INSERT OR REPLACE INTO vector_state(key, value) VALUES (?, ?)",
-            [
-                ("calibration_a", str(a)), ("calibration_b", str(b)),
-                ("calibration_samples", str(len(samples))), ("calibrated_at", now),
-                ("calibration_revision", revision),
-            ],
-        )
+        current = dict(self.conn.execute(
+            """SELECT key, value FROM vector_state
+               WHERE key IN ('calibration_a','calibration_b','calibration_samples',
+                             'calibrated_at','calibration_revision','calibration_run_id')"""
+        ).fetchall())
+        if run_id:
+            self.conn.execute(
+                "INSERT OR REPLACE INTO vector_state(key,value) VALUES (?,?)",
+                (f"calibration_backup:{run_id}", json.dumps(current)),
+            )
+        values = [
+            ("calibration_a", str(a)), ("calibration_b", str(b)),
+            ("calibration_samples", str(samples)), ("calibrated_at", now),
+            ("calibration_revision", revision),
+        ]
+        if run_id:
+            values.append(("calibration_run_id", run_id))
+        self.conn.executemany("INSERT OR REPLACE INTO vector_state(key, value) VALUES (?, ?)", values)
         self.conn.commit()
-        return {
-            "status": "calibrated", "a": a, "b": b,
-            "samples": len(samples), "positives": positives, "negatives": negatives,
-            "calibrated_at": now,
-        }
+        return {"status": "calibrated", "a": a, "b": b, "samples": samples,
+                "calibrated_at": now, "run_id": run_id}
+
+    def calibrate(self, samples: list[tuple[float, int]], *, iterations: int = 2000,
+                  learning_rate: float = 0.05) -> dict:
+        """Fit and install Platt-style calibration from labeled retrieval scores."""
+        a, b = self.fit_calibration(samples, iterations=iterations, learning_rate=learning_rate)
+        positives = sum(label for _, label in samples)
+        negatives = len(samples) - positives
+        result = self.install_calibration(a, b, samples=len(samples))
+        result.update({"positives": positives, "negatives": negatives})
+        return result
 
     def rebuild(self, articles: list[Article]) -> int:
         self.upsert_many(articles, rebuild=True)
@@ -481,6 +504,10 @@ class VectorIndex:
             "rebuild_required": not self.compatible,
             "rebuild_reason": self.rebuild_reason,
         }
+        state_rows = dict(self.conn.execute(
+            "SELECT key, value FROM vector_state WHERE key IN ('index_revision','calibration_run_id')"
+        ).fetchall())
+        state.update(state_rows)
         calibration = dict(self.conn.execute(
             """SELECT key, value FROM vector_state
                WHERE key IN ('calibration_samples', 'calibrated_at')"""

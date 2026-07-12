@@ -12,7 +12,7 @@ from typing import Any
 
 from ai_wiki.models import Article
 
-PROTOCOL_VERSION = "1.1"
+PROTOCOL_VERSION = "1.5"
 DEFAULT_CONTEXT_TOKENS = 4000
 MIN_CONTEXT_TOKENS = 256
 MAX_CONTEXT_TOKENS = 100_000
@@ -311,13 +311,18 @@ def build_context(index, query: str, *, max_tokens: int = DEFAULT_CONTEXT_TOKENS
         direct_candidates.append((article, float(result.get("hybrid_score", 0.0)), "hybrid"))
 
     direct_by_id = {article.id: (article, score, reason) for article, score, reason in direct_candidates}
+    direct_rank = {article.id: rank for rank, (article, _, _) in enumerate(direct_candidates)}
     related_by_parent: dict[str, list[tuple[Article, float, str]]] = {}
     promoted_relations: set[str] = set()
-    for article, score, _ in direct_candidates[:5]:
+    for parent_rank, (article, score, _) in enumerate(direct_candidates[:5]):
         for relation_id in article.related:
             if relation_id in promoted_relations or relation_id == article.id:
                 continue
             direct_relation = direct_by_id.get(relation_id)
+            # A weaker result must not demote a stronger direct match merely because
+            # it links to that document. Relations may only pull later results forward.
+            if direct_relation and direct_rank[relation_id] < parent_rank:
+                continue
             related = direct_relation[0] if direct_relation else load_article(relation_id)
             if related:
                 promoted_relations.add(related.id)

@@ -51,6 +51,22 @@ def test_rebuild(wiki_root, wiki_index, sample_article, sample_article_b):
     assert wiki_index.count() == 2
 
 
+def test_rebuild_recovers_corrupt_document_fts(wiki_root, wiki_index, sample_article):
+    wiki_index.upsert(sample_article, "a.yaml")
+    wiki_index.conn.execute(
+        "UPDATE articles_fts_data SET block = zeroblob(length(block)) WHERE id = "
+        "(SELECT max(id) FROM articles_fts_data)"
+    )
+    wiki_index.conn.commit()
+
+    assert wiki_index.fts_integrity()["ready"] is False
+
+    wiki_index.rebuild([(sample_article, "a.yaml")])
+
+    assert wiki_index.fts_integrity()["ready"] is True
+    assert wiki_index.search("sample")[0]["id"] == sample_article.id
+
+
 def test_orphans(wiki_root, wiki_index, sample_article):
     wiki_index.upsert(sample_article, "a.yaml")
     orphans = wiki_index.get_orphans()

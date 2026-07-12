@@ -1,9 +1,9 @@
 ---
 name: ai-wiki
-version: 0.6.0
+version: 1.0.0
 description: AI-first reusable knowledge encyclopedia. Retrieve evidence-linked context before answering, cite document paths, and autonomously write back reusable knowledge through validated create or patch operations.
 user-invocable: true
-argument-hint: "[capabilities|context|get|record-use|patch|create] [query or options]"
+argument-hint: "[capabilities|context|get|record-use|record-feedback|patch|create|temporal] [query or options]"
 ---
 
 # AI Wiki Skill
@@ -68,3 +68,9 @@ ai-wiki get <id> --view raw              # exact YAML inside JSON
 
 Use `search`, `vsearch`, `quality`, `doctor`, `reindex`, and `vindex` only for
 diagnostics or maintenance. `context` is the normal retrieval entrypoint.
+
+## Temporal Knowledge
+
+Use `temporal current`, `as-of`, `known-as-of`, `timeline`, `why-changed`, and
+`disputed` when the answer depends on when a fact was true or known. Never
+resolve proposed transitions by silently replacing a current claim.

@@ -1,6 +1,6 @@
 schema_version: 2
 id: seed-replaced-during-init
-title: "__WIKI_DISPLAY_NAME__ 자기참조 문서: AI 중심 지식 백과사전의 구조와 운영 원칙"
+title: "__WIKI_DISPLAY_NAME__ 안내서: 구조, 사용법, 안전 원칙"
 category: technology/ai/knowledge-systems
 tags:
   - __WIKI_COMMAND_NAME__
@@ -61,7 +61,7 @@ content:
       YAML 원본, FTS5·벡터·관계 검색, 근거 인용, 안전한 부분 수정과 목적별 격리를 제공한다.
       외부 AI 에이전트가 추론하고 웹 UI는 인간 검토를 보조한다.
     facts:
-      - "공용 엔진은 PyPI ai-wiki __ENGINE_VERSION__이며 AI 프로토콜 버전은 1.0이다."
+      - "공용 엔진은 PyPI ai-wiki __ENGINE_VERSION__이며 AI 명령의 통신 규칙 버전은 1.5이다."
       - "모든 핵심 AI 응답은 protocol_version, status, data, meta, error 필드를 갖는다."
       - "YAML 문서가 영속적 원본이고 SQLite wiki.db와 vectors.db는 파생 검색 인덱스다."
       - "기본 검색은 문서 FTS5, 한국어 trigram 청크 FTS, multilingual E5 및 sqlite-vec 청크 의미 검색을 RRF로 결합한다."
@@ -76,20 +76,20 @@ content:
       secondary: 인간이 문서, 출처, 검증 상태, 변경 이력과 사용 기록을 검토하게 한다.
       non_goal: AI Wiki 내부 모델이 최종 추론이나 답변 생성을 수행하는 것은 목표가 아니다.
     design_principles:
-      - "AI-first: 기본 인터페이스는 웹 화면이 아니라 결정적인 CLI JSON 프로토콜이다."
-      - "Evidence-linked: 지식은 문서 ID, JSON Pointer, 출처와 검증 수준으로 추적한다."
-      - "Local-first: 지식은 사용자 로컬 파일 시스템에 저장한다."
-      - "Structured source of truth: YAML 원본과 검색용 파생 인덱스의 책임을 분리한다."
-      - "Safe autonomy: AI 쓰기는 스키마, 버전 충돌, 보호 필드와 품질 규칙을 통과해야 한다."
-      - "Root isolation: 목적이 다른 위키의 문서, 인덱스와 사용 기록을 섞지 않는다."
-      - "Incremental evolution: 수정되는 문서부터 새 스키마로 전환한다."
+      - "AI 우선: 사람용 화면보다 AI가 안정적으로 읽을 수 있는 CLI JSON 규칙을 우선한다."
+      - "근거 연결: 지식은 문서 ID, JSON Pointer, 출처와 검증 수준으로 추적한다."
+      - "내 컴퓨터 우선: 지식은 사용자의 파일 시스템에 저장한다."
+      - "구조화된 기준 원본: YAML 원본과 검색용 색인의 역할을 분리한다."
+      - "안전한 자율 작업: AI가 문서를 쓸 때 문서 구조, 버전 충돌, 보호 항목과 품질 규칙을 검사한다."
+      - "위키별 완전 분리: 목적이 다른 위키의 문서, 색인과 사용 기록을 섞지 않는다."
+      - "단계적 개선: 기존 문서를 한꺼번에 바꾸지 않고 수정되는 문서부터 새 구조로 전환한다."
     architecture:
       durable_storage: articles/<category>/<subcategory>/<slug>.yaml의 schema v2 YAML
       metadata_index: data/wiki.db의 SQLite 메타데이터와 FTS5 전문 검색
       vector_index: data/vectors.db의 JSON 경로별 sqlite-vec 청크 임베딩과 벡터 메타데이터
       source_archive: sources 디렉터리에 보관되는 수집 원문
       operation_history: logs와 Git 자동 커밋에 남는 작업 이력
-      agent_interface: "__WIKI_COMMAND_NAME__ CLI와 protocol 1.0 JSON envelope"
+      agent_interface: "__WIKI_COMMAND_NAME__ CLI와 통신 규칙 1.5 JSON 응답"
       human_interface: Flask 기반 로컬 웹 UI의 문서, 목록, 그래프와 검토 화면
       shared_engine: PyPI ai-wiki 공용 엔진과 목적별 얇은 독립 패키지
     ai_workflow:
@@ -155,7 +155,7 @@ content:
       - 웹 UI는 AI 프로토콜의 대체물이 아니라 검토용 보조 인터페이스다.
     current_release:
       engine_version: __ENGINE_VERSION__
-      protocol_version: "1.1"
+      protocol_version: "1.5"
       distribution: [GitHub, PyPI]
       install_command: pip install ai-wiki
       wiki_command: __WIKI_COMMAND_NAME__
