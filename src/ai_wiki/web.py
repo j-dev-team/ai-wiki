@@ -721,7 +721,9 @@ def _mission_reader():
     else:
         principal = policy.resolve()
     store = MissionStore(root)
-    return store, MissionControlReader(store, policy, principal)
+    return store, MissionControlReader(
+        store, policy, principal, display_language=_current_lang(),
+    )
 
 
 def _positive_query_int(name: str, default: int | None = None) -> int | None:

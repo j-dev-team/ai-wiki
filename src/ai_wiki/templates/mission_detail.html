@@ -38,6 +38,15 @@
       </aside>
     </header>
 
+    <aside class="mission-language-state state-{{ mission.language.mode }}" aria-label="{{ t('mission_language.title') }}">
+      <strong>{{ t('mission_language.title') }}</strong>
+      {% if mission.language.mode == 'localized' %}<span>{{ t('mission_language.localized', language=mission.language.display_language) }}</span>
+      {% elif mission.language.mode == 'source' %}<span>{{ t('mission_language.source', language=mission.language.source_language) }}</span>
+      {% elif mission.language.mode == 'legacy_source' %}<span>{{ t('mission_language.legacy') }}</span>
+      {% else %}<span>{{ t('mission_language.fallback', language=mission.language.source_language) }}</span>{% endif %}
+      {% if mission.language.source_language in ['ko', 'en'] and mission.language.source_language != lang %}<a href="{{ url_for('mission_detail_view', mission_id=mission.id, revision=mission.revision, lang=mission.language.source_language) }}">{{ t('mission_language.view_source') }}</a>{% endif %}
+    </aside>
+
     <nav class="mission-revision-nav" aria-label="{{ t('mission_detail.revisions') }}">
       {% if previous_revision %}<a rel="prev" href="{{ url_for('mission_detail_view', mission_id=mission.id, revision=previous_revision, lang=lang) }}">← r{{ previous_revision }}</a>{% else %}<span aria-disabled="true">←</span>{% endif %}
       <span aria-current="page">{{ t('missions.revision') }} {{ mission.revision }}</span>
@@ -67,6 +76,54 @@
         <div><dt>{{ t('mission_detail.visibility') }}</dt><dd>{{ mission.policy.visibility }}{% if mission.policy.redacted_fields %} · {{ mission.policy.redacted_fields|length }} {{ t('mission_detail.redacted') }}{% endif %}</dd></div>
       </dl>
     </section>
+
+    {% if mission.kind == 'research_report' and mission.research %}
+    <section class="mission-report" aria-labelledby="research-report-title">
+      <div class="mission-section-heading">
+        <p class="mission-kicker">{{ t('mission_report.eyebrow') }}</p>
+        <h2 id="research-report-title">{{ t('mission_report.title') }}</h2>
+      </div>
+      <div class="mission-report-status">
+        <span>{{ t('mission_report.sufficient') }}</span>
+        <strong>{{ t('mission_report.sufficient_yes') if mission.research.sufficient else t('mission_report.sufficient_no') }}</strong>
+        <span>{{ mission.research.findings|length }} {{ t('mission_report.finding_count') }}</span>
+      </div>
+      <div class="mission-report-boundaries">
+        <section aria-labelledby="research-scope-title">
+          <h3 id="research-scope-title">{{ t('mission_report.scope') }}</h3>
+          <ul>{% for item in mission.research.scope %}<li>{{ item }}</li>{% else %}<li>{{ t('mission_report.none') }}</li>{% endfor %}</ul>
+        </section>
+        <section aria-labelledby="research-excluded-title">
+          <h3 id="research-excluded-title">{{ t('mission_report.excluded_scope') }}</h3>
+          <ul>{% for item in mission.research.excluded_scope %}<li>{{ item }}</li>{% else %}<li>{{ t('mission_report.none') }}</li>{% endfor %}</ul>
+        </section>
+      </div>
+      <section class="mission-findings" aria-labelledby="research-findings-title">
+        <h3 id="research-findings-title">{{ t('mission_report.findings') }}</h3>
+        <ol class="mission-finding-rail">
+          {% for finding in mission.research.findings %}
+          <li id="finding-{{ finding.id }}">
+            <span class="mission-finding-node" aria-hidden="true"></span>
+            <article aria-labelledby="finding-title-{{ finding.id }}">
+              <div class="mission-finding-heading"><code>{{ finding.id }}</code><h4 id="finding-title-{{ finding.id }}">{{ finding.title }}</h4></div>
+              <p>{{ finding.detail }}</p>
+              <footer>
+                <strong>{{ t('mission_report.finding_evidence') }}</strong>
+                {% for ref in finding.evidence_refs %}
+                  {% if ref.href %}<a href="{{ ref.href }}">{{ ref.value }}</a>{% else %}<code>{{ ref.value }}</code><span>{{ t('mission_report.evidence_unavailable') }}</span>{% endif %}
+                {% else %}<span>{{ t('mission_report.no_evidence') }}</span>{% endfor %}
+              </footer>
+            </article>
+          </li>
+          {% else %}<li class="mission-section-empty">{{ t('mission_report.no_findings') }}</li>{% endfor %}
+        </ol>
+      </section>
+      <div class="mission-report-conclusions">
+        <section aria-labelledby="research-recommendations-title"><h3 id="research-recommendations-title">{{ t('mission_report.recommendations') }}</h3><ol>{% for item in mission.research.recommendations %}<li>{{ item }}</li>{% else %}<li>{{ t('mission_report.none') }}</li>{% endfor %}</ol></section>
+        <section aria-labelledby="research-uncertainties-title"><h3 id="research-uncertainties-title">{{ t('mission_report.uncertainties') }}</h3><ul>{% for item in mission.research.uncertainties %}<li>{{ item }}</li>{% else %}<li>{{ t('mission_report.none') }}</li>{% endfor %}</ul></section>
+      </div>
+    </section>
+    {% endif %}
 
     {% if mission.kind in ['work_plan', 'work_run'] %}
     <section class="mission-progress-section" aria-labelledby="progress-title">
@@ -206,7 +263,7 @@
 
     {% endif %}
 
-    {% if mission.kind == 'work_run' %}
+    {% if mission.kind == 'work_run' or (mission.kind == 'work_plan' and mission.handoff_count) %}
     <section class="mission-handoff-section" aria-labelledby="handoff-title">
       <div class="mission-section-heading"><p class="mission-kicker">{{ t('mission_handoff.resume_context') }}</p><h2 id="handoff-title">{{ t('mission_handoff.title') }}</h2></div>
       <div class="mission-handoff-state state-{{ mission.handoff.completeness.state }}">
@@ -255,6 +312,7 @@
           <footer class="mission-evidence-backlinks">
             <strong>{{ t('mission_evidence.supports') }}</strong>
             {% if item.criterion_links %}{% for link in item.criterion_links %}<a href="#{{ link.anchor }}">{{ link.task_id }} · {{ link.criterion_id }}</a>{% endfor %}{% else %}<span>{{ t('mission_evidence.no_links') }}</span>{% endif %}
+            {% if item.finding_links %}<strong>{{ t('mission_report.supports_findings') }}</strong>{% for link in item.finding_links %}<a href="#{{ link.anchor }}">{{ link.finding_id }} · {{ link.title }}</a>{% endfor %}{% endif %}
           </footer>
         </details>
         {% endfor %}

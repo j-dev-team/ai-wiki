@@ -107,17 +107,10 @@ MESSAGES: dict[str, dict[str, str]] = {
 }
 
 def _get_lang() -> str:
-    """Read the 'lang' field from .ai-wiki.yaml. Returns 'en' as default."""
-    try:
-        from ai_wiki.storage import get_wiki_root
-        config_path = get_wiki_root() / CONFIG_FILENAME
-        if config_path.exists():
-            cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-            if isinstance(cfg, dict):
-                return cfg.get("lang", "en")
-    except Exception:
-        pass
-    return "en"
+    """Return the active wiki's canonical authoring language."""
+    from ai_wiki.language import wiki_language
+
+    return wiki_language()
 
 
 def msg(key: str, *args) -> str:
@@ -1019,8 +1012,10 @@ def capabilities(ctx, principal):
     except PolicyDenied:
         security = {"mode": policy.mode, "principal": None, "roles": []}
     from ai_wiki.mission_contracts import mission_json_schema
+    from ai_wiki.language import SUPPORTED_WIKI_LANGUAGES, resolve_wiki_language
     from ai_wiki.plugins import discover_plugins
     from ai_wiki.temporal_contracts import temporal_json_schema
+    language = resolve_wiki_language(get_wiki_root())
     output_json(protocol_success({
         "protocol_version": PROTOCOL_VERSION,
         "compatible_protocol_versions": ["1.1", "1.2", "1.3", "1.4", "1.5"],
@@ -1037,7 +1032,19 @@ def capabilities(ctx, principal):
             "patch": {"operations": ["test", "add", "replace", "remove"], "if_version_required": True},
             "create": {"document_file": "JSON path or - for stdin"},
             "temporal": {"views": ["current", "as-of", "known-as-of", "timeline", "why-changed", "disputed"]},
-            "mission": {"kinds": ["research_report", "work_plan", "work_run", "knowledge_candidate"]},
+            "mission": {
+                "kinds": ["research_report", "work_plan", "work_run", "knowledge_candidate"],
+                "authoring_language": language.language,
+                "source_language_field": "metadata.source_language",
+                "localizations_field": "localizations",
+            },
+        },
+        "language": {
+            **language.as_dict(),
+            "supported": list(SUPPORTED_WIKI_LANGUAGES),
+            "authoring_language": language.language,
+            "display_language_is_user_selectable": True,
+            "technical_fields_are_source_only": True,
         },
         "content_types": sorted(TYPE_SCHEMAS),
         "schema": document_json_schema(),
@@ -1736,6 +1743,18 @@ def mission_create(ctx, document_file, principal, dry_run):
         raw = load_json_input(document_file)
         if not isinstance(raw, dict):
             raise ValueError("invalid_mission_document")
+        from copy import deepcopy
+        from ai_wiki.language import resolve_wiki_language
+        from ai_wiki.mission_contracts import (
+            MissionDocument, validate_mission_authoring_quality,
+        )
+        raw = deepcopy(raw)
+        language = resolve_wiki_language(get_wiki_root())
+        raw.setdefault("metadata", {}).setdefault("source_language", language.language)
+        candidate = MissionDocument.model_validate(raw, strict=True)
+        validate_mission_authoring_quality(
+            candidate, expected_language=language.language,
+        )
         namespace = {"work_plan": "plans", "work_run": "runs"}.get(raw.get("kind"), "artifacts")
         policy, resolved = _authorize(ctx, principal, "create", namespace)
         policy.validate_secrets(raw)

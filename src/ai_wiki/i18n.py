@@ -45,6 +45,29 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "handoff_reason.policy_redacted": "권한에 따라 가림",
         "mission_evidence.proof_record": "완료 근거",
         "mission_evidence.title": "연결된 증거",
+        "mission_report.eyebrow": "조사 결과",
+        "mission_report.title": "조사 내용",
+        "mission_report.sufficient": "조사 충분성",
+        "mission_report.sufficient_yes": "판단에 충분함",
+        "mission_report.sufficient_no": "추가 조사가 필요함",
+        "mission_report.finding_count": "개 발견",
+        "mission_report.scope": "조사 범위",
+        "mission_report.excluded_scope": "조사에서 제외한 범위",
+        "mission_report.findings": "발견 사항",
+        "mission_report.finding_evidence": "이 발견의 근거",
+        "mission_report.no_evidence": "연결된 근거 없음",
+        "mission_report.evidence_unavailable": "근거를 사용할 수 없음",
+        "mission_report.no_findings": "기록된 발견 사항이 없습니다.",
+        "mission_report.recommendations": "권장 조치",
+        "mission_report.uncertainties": "아직 결정이 필요한 사항",
+        "mission_report.supports_findings": "뒷받침하는 발견",
+        "mission_report.none": "없음",
+        "mission_language.title": "문서 언어",
+        "mission_language.localized": "{language} 번역 표시",
+        "mission_language.source": "{language} 원문 표시",
+        "mission_language.legacy": "작성 언어 미상 · 원문 표시",
+        "mission_language.fallback": "{language} 원문으로 대체 표시",
+        "mission_language.view_source": "원문 보기",
         "mission_evidence.linked_criteria": "개 기준 연결",
         "mission_evidence.redacted_help": "현재 권한에서는 이 증거의 일부 필드를 볼 수 없습니다.",
         "mission_evidence.unavailable_help": "원본 증거를 현재 사용할 수 없습니다. 복구 후 다시 검토하세요.",
@@ -283,6 +306,29 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "handoff_reason.policy_redacted": "Redacted by policy",
         "mission_evidence.proof_record": "Completion proof",
         "mission_evidence.title": "Linked evidence",
+        "mission_report.eyebrow": "Research outcome",
+        "mission_report.title": "Research content",
+        "mission_report.sufficient": "Research sufficiency",
+        "mission_report.sufficient_yes": "Sufficient for a decision",
+        "mission_report.sufficient_no": "More research is needed",
+        "mission_report.finding_count": "findings",
+        "mission_report.scope": "Research scope",
+        "mission_report.excluded_scope": "Excluded scope",
+        "mission_report.findings": "Findings",
+        "mission_report.finding_evidence": "Evidence for this finding",
+        "mission_report.no_evidence": "No linked evidence",
+        "mission_report.evidence_unavailable": "Evidence unavailable",
+        "mission_report.no_findings": "No findings were recorded.",
+        "mission_report.recommendations": "Recommended actions",
+        "mission_report.uncertainties": "Open decisions",
+        "mission_report.supports_findings": "Supports findings",
+        "mission_report.none": "None",
+        "mission_language.title": "Document language",
+        "mission_language.localized": "Showing {language} translation",
+        "mission_language.source": "Showing {language} source",
+        "mission_language.legacy": "Source language unknown · showing original",
+        "mission_language.fallback": "Showing {language} source as fallback",
+        "mission_language.view_source": "View source",
         "mission_evidence.linked_criteria": "criteria linked",
         "mission_evidence.redacted_help": "Some evidence fields are hidden for the current role.",
         "mission_evidence.unavailable_help": "The source evidence is unavailable. Restore it before review.",
@@ -712,8 +758,9 @@ EASY_TERM_REPLACEMENTS = (
 
 
 def default_lang() -> str:
-    lang = os.environ.get("AI_WIKI_LANG", "ko").lower()
-    return lang if lang in SUPPORTED_LANGS else "ko"
+    from ai_wiki.language import wiki_language
+
+    return wiki_language()
 
 
 def translate(lang: str, key: str, **kwargs: object) -> str:

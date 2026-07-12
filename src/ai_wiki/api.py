@@ -13,6 +13,7 @@ from ai_wiki.agent_protocol import (
 )
 from ai_wiki.index import WikiIndex
 from ai_wiki.mission_contracts import mission_json_schema
+from ai_wiki.language import SUPPORTED_WIKI_LANGUAGES, resolve_wiki_language
 from ai_wiki.missions import MissionControlReader, MissionStore
 from ai_wiki.models import Article
 from ai_wiki.policy import PolicyDenied, SecurityPolicy, namespace_for_kind
@@ -60,6 +61,7 @@ class AIWikiClient:
     def capabilities(self) -> dict[str, Any]:
         from ai_wiki.plugins import discover_plugins
         principal = self._principal()
+        language = resolve_wiki_language(self.root)
         return success({
             "protocol_version": PROTOCOL_VERSION,
             "compatible_protocol_versions": ["1.1", "1.2", "1.3", "1.4", "1.5"],
@@ -75,7 +77,17 @@ class AIWikiClient:
                 "temporal": {"views": ["current", "as-of", "known-as-of", "timeline",
                                         "why-changed", "disputed"]},
                 "mission": {"kinds": ["research_report", "work_plan", "work_run",
-                                         "knowledge_candidate"]},
+                                         "knowledge_candidate"],
+                            "authoring_language": language.language,
+                            "source_language_field": "metadata.source_language",
+                            "localizations_field": "localizations"},
+            },
+            "language": {
+                **language.as_dict(),
+                "supported": list(SUPPORTED_WIKI_LANGUAGES),
+                "authoring_language": language.language,
+                "display_language_is_user_selectable": True,
+                "technical_fields_are_source_only": True,
             },
             "contracts": ["document", "document-v3", "temporal", "research-report",
                           "work-plan", "work-run", "knowledge-candidate", "security",
@@ -183,9 +195,11 @@ class AIWikiClient:
     def mission_list(
         self, *, kind: str | None = None, status: str | None = None,
         plan_id: str | None = None, run_id: str | None = None,
-        limit: int = 50, offset: int = 0,
+        limit: int = 50, offset: int = 0, language: str | None = None,
     ) -> dict[str, Any]:
-        reader = MissionControlReader(self.missions, self.policy, self._principal())
+        reader = MissionControlReader(
+            self.missions, self.policy, self._principal(), display_language=language,
+        )
         page = reader.list(
             kind=kind, status=status, plan_id=plan_id, run_id=run_id,
             limit=limit, offset=offset,
@@ -196,8 +210,13 @@ class AIWikiClient:
             "has_more": page["has_more"],
         })
 
-    def mission_detail(self, mission_id: str, *, revision: int | None = None) -> dict[str, Any]:
-        reader = MissionControlReader(self.missions, self.policy, self._principal())
+    def mission_detail(
+        self, mission_id: str, *, revision: int | None = None,
+        language: str | None = None,
+    ) -> dict[str, Any]:
+        reader = MissionControlReader(
+            self.missions, self.policy, self._principal(), display_language=language,
+        )
         detail = reader.detail(mission_id, revision)
         if detail is None:
             raise ValueError("mission_not_found")

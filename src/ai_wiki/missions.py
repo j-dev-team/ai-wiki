@@ -14,9 +14,10 @@ from typing import Any
 import yaml
 
 from ai_wiki.mission_contracts import (
-    MissionDocument, MissionEvent, MissionEvidence, TaskState, WorkPlanPayload,
+    MissionDocument, MissionEvent, MissionEvidence, ResearchReportPayload, TaskState, WorkPlanPayload,
     WorkRunPayload, criterion_coverage_keys, criterion_records, handoff_view,
-    validate_transition,
+    localization_values,
+    validate_mission_authoring_quality, validate_transition,
 )
 from ai_wiki.storage import _atomic_write_bytes
 
@@ -107,10 +108,16 @@ class MissionStore:
 
     def _backfill_index_fields(self) -> None:
         rows = self.conn.execute(
-            "SELECT id, revision, file_path FROM mission_documents "
-            "WHERE summary_json IS NULL OR (plan_id IS NULL AND run_id IS NULL)"
+            "SELECT id, revision, file_path, plan_id, run_id, summary_json "
+            "FROM mission_documents"
         ).fetchall()
         for row in rows:
+            try:
+                existing_summary = json.loads(row["summary_json"] or "{}")
+            except (TypeError, json.JSONDecodeError):
+                existing_summary = {}
+            if "source_language" in existing_summary:
+                continue
             path = self.root / row["file_path"]
             if not path.exists():
                 continue
@@ -135,6 +142,9 @@ class MissionStore:
         """Return the non-sensitive summary persisted for constant-query overview reads."""
         summary: dict[str, Any] = {
             "objective": "",
+            "source_language": document.metadata.source_language,
+            "objective_localizations": {},
+            "localization_source_revisions": {},
             "approval_status": None,
             "task_counts": {
                 "total": 0, "in_progress": 0, "blocked": 0,
@@ -148,6 +158,13 @@ class MissionStore:
         if document.kind == "work_plan":
             plan = WorkPlanPayload.model_validate(document.payload)
             summary["objective"] = plan.objective
+            summary["objective_localizations"] = {
+                item.language: item.values["objective"]
+                for item in document.localizations if "objective" in item.values
+            }
+            summary["localization_source_revisions"] = {
+                item.language: item.source_revision for item in document.localizations
+            }
             summary["approval_status"] = plan.approval.status
             summary["task_counts"]["total"] = len(plan.tasks)
             summary["criterion_counts"]["total"] = len(plan.acceptance_criteria) + sum(
@@ -171,6 +188,14 @@ class MissionStore:
                     raise ValueError("pinned plan unavailable")
                 plan = WorkPlanPayload.model_validate(pinned.payload)
                 summary["objective"] = plan.objective
+                summary["source_language"] = pinned.metadata.source_language
+                summary["objective_localizations"] = {
+                    item.language: item.values["objective"]
+                    for item in pinned.localizations if "objective" in item.values
+                }
+                summary["localization_source_revisions"] = {
+                    item.language: item.source_revision for item in pinned.localizations
+                }
                 summary["approval_status"] = plan.approval.status
                 evidence = {item.evidence_id: item for item in document.evidence}
                 states = {item.task_id: item for item in run.task_states}
@@ -210,9 +235,26 @@ class MissionStore:
         if document.kind == "research_report":
             scope = document.payload.get("scope") or []
             summary["objective"] = str(scope[0]) if scope else document.id
+            summary["objective_localizations"] = {
+                item.language: (
+                    item.values.get("summary") or item.values.get("scope.0")
+                )
+                for item in document.localizations
+                if item.values.get("summary") or item.values.get("scope.0")
+            }
+            summary["localization_source_revisions"] = {
+                item.language: item.source_revision for item in document.localizations
+            }
             return summary
         if document.kind == "knowledge_candidate":
             summary["objective"] = str(document.payload.get("reusable_summary") or document.id)
+            summary["objective_localizations"] = {
+                item.language: item.values["reusable_summary"]
+                for item in document.localizations if "reusable_summary" in item.values
+            }
+            summary["localization_source_revisions"] = {
+                item.language: item.source_revision for item in document.localizations
+            }
             return summary
         return summary
 
@@ -245,6 +287,7 @@ class MissionStore:
 
     def create(self, raw: dict[str, Any], *, dry_run: bool = False) -> MissionDocument:
         document = MissionDocument.model_validate(raw, strict=True)
+        validate_mission_authoring_quality(document)
         if self.get(document.id) is not None:
             raise ValueError("mission_already_exists")
         if not dry_run:
@@ -301,6 +344,12 @@ class MissionStore:
             if value:
                 clauses.append(f"d.{column}=?")
                 params.append(value)
+        if kind is None and status is None and plan_id is None and run_id is None:
+            clauses.append(
+                "(d.kind!='work_run' OR d.plan_id IS NULL OR NOT EXISTS ("
+                "SELECT 1 FROM mission_documents p WHERE p.kind='work_plan' "
+                "AND p.plan_id=d.plan_id))"
+            )
         where = " AND ".join(clauses)
         total = int(self.conn.execute(
             f"SELECT COUNT(*) FROM mission_documents d WHERE {where}", params,
@@ -319,6 +368,18 @@ class MissionStore:
             "items": items, "total": total, "limit": limit, "offset": offset,
             "has_more": offset + len(items) < total,
         }
+
+    def representative_run_record(self, plan_id: str) -> dict[str, Any] | None:
+        """Return the latest completed run, or otherwise the latest run, for a plan."""
+        row = self.conn.execute(
+            "SELECT r.* FROM mission_documents r "
+            "WHERE r.kind='work_run' AND r.plan_id=? AND "
+            "r.revision=(SELECT MAX(rr.revision) FROM mission_documents rr WHERE rr.id=r.id) "
+            "ORDER BY CASE WHEN r.status='completed' THEN 0 ELSE 1 END, "
+            "r.modified_at DESC, r.id ASC LIMIT 1",
+            (plan_id,),
+        ).fetchone()
+        return dict(row) if row else None
 
     def index_record(self, mission_id: str, revision: int | None = None) -> dict[str, Any] | None:
         if revision is None:
@@ -346,6 +407,7 @@ class MissionStore:
         raw["revision"] = before.revision + 1
         raw["metadata"]["modified_at"] = utc_text()
         after = MissionDocument.model_validate(raw, strict=True)
+        validate_mission_authoring_quality(after)
         validate_transition(before, after, roles=roles)
         event = MissionEvent(
             event_id=uuid.uuid4().hex,
@@ -415,6 +477,7 @@ class MissionStore:
             "metadata": {
                 "created_at": now, "modified_at": now,
                 "created_by": actor, "namespace": "runs",
+                "source_language": plan.metadata.source_language,
             },
             "payload": {
                 "run_id": run_id, "plan_id": plan.id, "plan_revision": plan.revision,
@@ -534,10 +597,41 @@ class MissionStore:
 class MissionControlReader:
     """Build revision-pinned, policy-filtered Mission Control read models."""
 
-    def __init__(self, store: MissionStore, policy, principal):
+    def __init__(self, store: MissionStore, policy, principal, display_language: str | None = None):
+        from ai_wiki.language import SUPPORTED_WIKI_LANGUAGES, wiki_language
+
         self.store = store
         self.policy = policy
         self.principal = principal
+        self.display_language = (
+            display_language if display_language in SUPPORTED_WIKI_LANGUAGES
+            else wiki_language(store.root)
+        )
+
+    def _language_state(
+        self, source_language: str, localizations: dict[str, str],
+        source_revisions: dict[str, int | None] | None = None,
+    ) -> dict[str, Any]:
+        localized = bool(localizations.get(self.display_language))
+        if localized:
+            mode = "localized"
+        elif source_language == self.display_language:
+            mode = "source"
+        elif source_language == "und":
+            mode = "legacy_source"
+        else:
+            mode = "fallback_source"
+        return {
+            "source_language": source_language,
+            "display_language": self.display_language,
+            "mode": mode,
+            "fallback": mode in {"legacy_source", "fallback_source"},
+            "available_localizations": sorted(localizations),
+            "source_available": True,
+            "localization_source_revision": (source_revisions or {}).get(
+                self.display_language,
+            ),
+        }
 
     @staticmethod
     def _namespace(kind: str) -> str:
@@ -562,6 +656,36 @@ class MissionControlReader:
                 summary = {"degraded": True}
             if row["kind"] == "work_plan":
                 summary["linked_run_count"] = int(row.get("linked_run_count") or 0)
+                representative = self.store.representative_run_record(
+                    str(row.get("plan_id") or row["id"]),
+                )
+                if representative is not None:
+                    try:
+                        run_summary = json.loads(
+                            representative.get("summary_json") or "{}",
+                        )
+                    except (TypeError, json.JSONDecodeError):
+                        run_summary = {"degraded": True}
+                    for key in (
+                        "task_counts", "criterion_counts", "evidence_count",
+                        "handoff_present", "degraded",
+                    ):
+                        if key in run_summary:
+                            summary[key] = run_summary[key]
+                    summary["representative_run"] = {
+                        "id": representative["id"],
+                        "revision": representative["revision"],
+                        "status": representative["status"],
+                    }
+            source_objective = summary.get("objective", "")
+            localized = summary.get("objective_localizations") or {}
+            language = self._language_state(
+                str(summary.get("source_language") or "und"), localized,
+                summary.get("localization_source_revisions") or {},
+            )
+            summary["source_objective"] = source_objective
+            summary["objective"] = localized.get(self.display_language, source_objective)
+            summary["language"] = language
             items.append({
                 "id": row["id"], "kind": row["kind"], "revision": row["revision"],
                 "status": row["status"], "modified_at": row["modified_at"],
@@ -594,6 +718,7 @@ class MissionControlReader:
             "summary": {},
             "plan": None,
             "run": None,
+            "research": None,
             "task_counts": {},
             "criterion_counts": {},
             "tasks": [],
@@ -603,23 +728,29 @@ class MissionControlReader:
             "execution_events": [],
             "review_decisions": [],
             "payload": deepcopy(document.payload),
+            "language": self._language_state(
+                document.metadata.source_language,
+                {item.language: "available" for item in document.localizations},
+                {item.language: item.source_revision for item in document.localizations},
+            ),
         }
         if document.kind == "work_plan":
             self._add_plan_detail(detail, document)
+            self._localize_plan_detail(detail, document)
         elif document.kind == "work_run":
             self._add_run_detail(detail, document)
         elif document.kind == "research_report":
-            detail["summary"] = {
-                "objective": document.payload.get("scope", [document.id])[0],
-                "finding_count": len(document.payload.get("findings", [])),
-                "sufficient": bool(document.payload.get("sufficient")),
-            }
+            self._add_research_detail(detail, document)
+            self._localize_research_detail(detail, document)
         elif document.kind == "knowledge_candidate":
             detail["summary"] = {
                 "objective": document.payload.get("reusable_summary", ""),
                 "action": document.payload.get("action"),
                 "verification_status": document.payload.get("verification_status"),
             }
+            values = localization_values(document, self.display_language)
+            if values.get("reusable_summary"):
+                detail["summary"]["objective"] = values["reusable_summary"]
         self._prepare_evidence_and_history(detail)
         output, _ = self.policy.redact_mission_detail(self.principal, detail)
         return output
@@ -636,17 +767,19 @@ class MissionControlReader:
                 "message": message,
                 "recovery": "Restore or repair this exact indexed Mission revision, validate it, and retry the read-only request.",
             }],
-            "summary": {}, "plan": None, "run": None, "task_counts": {},
+            "summary": {}, "plan": None, "run": None, "research": None, "task_counts": {},
             "criterion_counts": {}, "tasks": [], "evidence": [],
             "handoff": handoff_view({}), "history": [], "execution_events": [],
             "review_decisions": [],
             "payload": {},
+            "language": self._language_state("und", {}),
         }
         output, _ = self.policy.redact_mission_detail(self.principal, detail)
         return output
 
     def _prepare_evidence_and_history(self, detail: dict[str, Any]) -> None:
         criterion_links: dict[str, list[dict[str, str]]] = {}
+        finding_links: dict[str, list[dict[str, str]]] = {}
         plan = detail.get("plan") or {}
         for criterion in plan.get("global_criteria", []):
             link = {
@@ -667,10 +800,23 @@ class MissionControlReader:
                 }
                 for evidence_id in criterion.get("evidence_ids", []):
                     criterion_links.setdefault(evidence_id, []).append(link)
+        for finding in (detail.get("research") or {}).get("findings", []):
+            link = {
+                "finding_id": finding["id"],
+                "title": finding["title"],
+                "anchor": f"finding-{finding['id']}",
+            }
+            for evidence_ref in finding.get("evidence_refs", []):
+                if evidence_ref.get("state") == "available":
+                    finding_links.setdefault(evidence_ref["value"], []).append(link)
         for evidence in detail.get("evidence", []):
             evidence["criterion_links"] = sorted(
                 criterion_links.get(evidence["evidence_id"], []),
                 key=lambda item: (item["task_id"], item["criterion_id"]),
+            )
+            evidence["finding_links"] = sorted(
+                finding_links.get(evidence["evidence_id"], []),
+                key=lambda item: item["finding_id"],
             )
 
         event_key = lambda item: (str(item.get("at") or ""), str(item.get("event_id") or ""))
@@ -798,6 +944,42 @@ class MissionControlReader:
         global_criteria = self._global_criteria(plan)
         task_counts, criterion_counts = self._counts(tasks, global_criteria)
         runs = self.store.list_page(kind="work_run", plan_id=plan.plan_id, limit=100)["items"]
+        representative_record = self.store.representative_run_record(plan.plan_id)
+        representative = None
+        representative_handoff_present = False
+        if representative_record is not None:
+            try:
+                run_document = self.store.get(
+                    representative_record["id"], representative_record["revision"],
+                )
+                if run_document is not None and run_document.kind == "work_run":
+                    run = WorkRunPayload.model_validate(run_document.payload)
+                    states = {item.task_id: item for item in run.task_states}
+                    evidence = {item.evidence_id: item for item in run_document.evidence}
+                    tasks = self._plan_tasks(plan, states=states, evidence=evidence)
+                    global_criteria = self._global_criteria(
+                        plan, evidence=evidence, run_status=run_document.status,
+                    )
+                    task_counts, criterion_counts = self._counts(tasks, global_criteria)
+                    detail["evidence"] = [
+                        item.model_dump(mode="json") for item in run_document.evidence
+                    ]
+                    detail["handoff"] = handoff_view(run.handoff)
+                    representative_handoff_present = bool(run.handoff)
+                    detail["execution_events"] = [
+                        item.model_dump(mode="json") for item in run.execution_events
+                    ]
+                    representative = {
+                        "id": run.run_id, "revision": run_document.revision,
+                        "status": run_document.status,
+                        "plan_revision": run.plan_revision,
+                    }
+            except Exception as exc:
+                detail["degraded"].append({
+                    "code": "representative_run_unavailable",
+                    "message": str(exc),
+                    "recovery": "Open the linked WorkRun directly and repair its latest indexed revision.",
+                })
         detail.update({
             "summary": {
                 "objective": plan.objective,
@@ -805,6 +987,7 @@ class MissionControlReader:
                 "scope": plan.scope,
                 "constraints": plan.constraints,
                 "linked_run_count": len(runs),
+                "representative_run": representative,
             },
             "plan": {
                 "id": plan.plan_id, "revision": document.revision,
@@ -816,9 +999,136 @@ class MissionControlReader:
             },
             "tasks": tasks, "task_counts": task_counts,
             "criterion_counts": criterion_counts,
+            "evidence_count": len(detail["evidence"]),
+            "handoff_count": int(representative_handoff_present),
+        })
+        if representative is not None:
+            self._prepare_handoff(detail, run_document)
+
+    def _add_research_detail(
+        self, detail: dict[str, Any], document: MissionDocument,
+    ) -> None:
+        report = ResearchReportPayload.model_validate(document.payload)
+        known_evidence = {item.evidence_id for item in document.evidence}
+        findings = []
+        for finding in report.findings:
+            evidence_refs = []
+            for evidence_id in finding.evidence_ids:
+                available = evidence_id in known_evidence
+                evidence_refs.append({
+                    "value": evidence_id,
+                    "state": "available" if available else "unavailable",
+                    "href": f"#evidence-{evidence_id}" if available else None,
+                    "reason": "" if available else "evidence_not_found",
+                })
+            findings.append({
+                **finding.model_dump(mode="json"),
+                "evidence_refs": evidence_refs,
+            })
+        detail.update({
+            "summary": {
+                "objective": report.scope[0],
+                "finding_count": len(findings),
+                "sufficient": report.sufficient,
+            },
+            "research": {
+                "workspace_root": report.workspace_root,
+                "scope": report.scope,
+                "excluded_scope": report.excluded_scope,
+                "findings": findings,
+                "recommendations": report.recommendations,
+                "uncertainties": report.uncertainties,
+                "sufficient": report.sufficient,
+            },
             "evidence_count": len(document.evidence),
             "handoff_count": 0,
         })
+
+    @staticmethod
+    def _replace_indexed(values: dict[str, str], prefix: str, items: list[str]) -> list[str]:
+        return [values.get(f"{prefix}.{index}", value) for index, value in enumerate(items)]
+
+    def _localize_research_detail(
+        self, detail: dict[str, Any], document: MissionDocument,
+    ) -> None:
+        values = localization_values(document, self.display_language)
+        if not values:
+            return
+        research = detail["research"]
+        research["scope"] = self._replace_indexed(values, "scope", research["scope"])
+        research["excluded_scope"] = self._replace_indexed(
+            values, "excluded_scope", research["excluded_scope"],
+        )
+        for finding in research["findings"]:
+            finding["title"] = values.get(f"findings.{finding['id']}.title", finding["title"])
+            finding["detail"] = values.get(f"findings.{finding['id']}.detail", finding["detail"])
+        research["recommendations"] = self._replace_indexed(
+            values, "recommendations", research["recommendations"],
+        )
+        research["uncertainties"] = self._replace_indexed(
+            values, "uncertainties", research["uncertainties"],
+        )
+        detail["summary"]["objective"] = values.get(
+            "summary", values.get("scope.0", detail["summary"]["objective"]),
+        )
+
+    def _localize_plan_detail(
+        self, detail: dict[str, Any], document: MissionDocument,
+    ) -> None:
+        values = localization_values(document, self.display_language)
+        detail["plan_language"] = self._language_state(
+            document.metadata.source_language,
+            {item.language: "available" for item in document.localizations},
+            {item.language: item.source_revision for item in document.localizations},
+        )
+        if not values:
+            return
+        detail["summary"]["objective"] = values.get(
+            "objective", detail["summary"]["objective"],
+        )
+        detail["summary"]["scope"] = self._replace_indexed(
+            values, "scope", detail["summary"].get("scope", []),
+        )
+        detail["summary"]["constraints"] = self._replace_indexed(
+            values, "constraints", detail["summary"].get("constraints", []),
+        )
+        for criterion in (detail.get("plan") or {}).get("global_criteria", []):
+            criterion["text"] = values.get(
+                f"global_criteria.{criterion['id']}", criterion["text"],
+            )
+        for task in detail.get("tasks", []):
+            prefix = f"tasks.{task['id']}"
+            task["title"] = values.get(f"{prefix}.title", task["title"])
+            task["instructions"] = values.get(f"{prefix}.instructions", task["instructions"])
+            task["verification"] = self._replace_indexed(
+                values, f"{prefix}.verification", task.get("verification", []),
+            )
+            task["authorization"] = self._replace_indexed(
+                values, f"{prefix}.authorization", task.get("authorization", []),
+            )
+            for criterion in task.get("criteria", []):
+                criterion["text"] = values.get(
+                    f"{prefix}.criteria.{criterion['id']}", criterion["text"],
+                )
+
+    def _localize_run_detail(
+        self, detail: dict[str, Any], document: MissionDocument,
+    ) -> None:
+        values = localization_values(document, self.display_language)
+        if not values:
+            return
+        for task in detail.get("tasks", []):
+            task["result"] = values.get(f"tasks.{task['id']}.result", task["result"])
+        handoff = detail.get("handoff") or {}
+        handoff["current_state"] = values.get(
+            "handoff.current_state", handoff.get("current_state", ""),
+        )
+        handoff["remaining_work"] = self._replace_indexed(
+            values, "handoff.remaining_work", handoff.get("remaining_work", []),
+        )
+        handoff["blockers"] = self._replace_indexed(
+            values, "handoff.blockers", handoff.get("blockers", []),
+        )
 
     def _add_run_detail(self, detail: dict[str, Any], document: MissionDocument) -> None:
         run = WorkRunPayload.model_validate(document.payload)
@@ -869,6 +1179,7 @@ class MissionControlReader:
             detail["summary"] = {"objective": "Pinned plan unavailable"}
             detail["tasks"] = tasks
             detail["task_counts"], detail["criterion_counts"] = self._counts(tasks)
+            self._localize_run_detail(detail, document)
             return
         if pinned.kind != "work_plan":
             detail["degraded"].append({
@@ -916,6 +1227,10 @@ class MissionControlReader:
         detail["task_counts"], detail["criterion_counts"] = self._counts(
             tasks, global_criteria,
         )
+        self._localize_plan_detail(detail, pinned)
+        detail["run_language"] = detail["language"]
+        detail["language"] = detail["plan_language"]
+        self._localize_run_detail(detail, document)
 
     def _prepare_handoff(self, detail: dict[str, Any], document: MissionDocument) -> None:
         handoff = detail["handoff"]

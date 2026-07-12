@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0 - 2026-07-13
+
+- Add a shared `ko`/`en` authoring-language resolver across CLI, web, capabilities, and purpose-specific wiki runtimes.
+- Add Mission source-language and revision-bound localization contracts while preserving legacy records and technical source text.
+- Require readable, language-matched ResearchReport and WorkPlan prose and make Windows JSON stdin explicitly UTF-8 safe.
+- Render ResearchReport scope, findings, recommendations, uncertainties, and bidirectional evidence links in Mission Control.
+- Localize Mission list, detail, and API narratives with explicit source and fallback state.
+- Present each WorkPlan and its WorkRun records as one logical Mission in the default overview while retaining immutable plan/run records and explicit run filters.
+- Project the representative run's task, criterion, evidence, and handoff state onto the plan card and detail view.
+- Add language, legacy, localization, Mission aggregation, accessibility, responsive, performance, package, and browser regression coverage.
+
 ## 1.0.0 - 2026-07-12
 
 - Add schema-v3 temporal entities, claims, events, evidence, transitions, lazy v2 views, and time-aware queries.

@@ -81,6 +81,7 @@
             </div>
             <h3><a href="/missions/{{ mission.id|urlencode }}?revision={{ mission.revision }}&amp;lang={{ lang }}">{{ mission.id }}</a></h3>
             <p class="mission-objective">{{ summary.objective or t('missions.objective_unavailable') }}</p>
+            {% if summary.language.fallback %}<p class="mission-language-fallback">{{ t('mission_language.legacy') if summary.language.mode == 'legacy_source' else t('mission_language.fallback', language=summary.language.source_language) }}</p>{% endif %}
             <div class="mission-relationship">
               {% if mission.kind == 'work_run' and mission.plan_id %}
               <span>{{ t('missions.run_of') }}</span>

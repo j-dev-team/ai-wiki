@@ -530,7 +530,11 @@ def apply_json_patch(document: dict[str, Any], operations: list[dict[str, Any]])
 
 def load_json_input(path: str) -> Any:
     import sys
-    raw = sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
+    if path == "-":
+        binary = getattr(sys.stdin, "buffer", None)
+        raw = binary.read().decode("utf-8-sig") if binary is not None else sys.stdin.read()
+    else:
+        raw = Path(path).read_text(encoding="utf-8-sig")
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:

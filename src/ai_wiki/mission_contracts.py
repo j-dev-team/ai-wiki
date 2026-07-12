@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import datetime
 from typing import Any, Literal
 
@@ -97,11 +98,26 @@ class MissionMetadata(MissionModel):
     modified_at: datetime
     created_by: str = Field(min_length=1)
     namespace: Literal["plans", "runs", "artifacts"]
+    source_language: Literal["ko", "en", "und"] = "und"
 
     @field_validator("created_at", "modified_at", mode="before")
     @classmethod
     def parse_dates(cls, value):
         return _dt(value)
+
+
+class MissionLocalization(MissionModel):
+    language: Literal["ko", "en"]
+    source_revision: int | None = Field(default=None, ge=1)
+    values: dict[str, str] = Field(min_length=1)
+
+    @field_validator("values")
+    @classmethod
+    def values_are_readable(cls, values: dict[str, str]) -> dict[str, str]:
+        for key, value in values.items():
+            if not key.strip() or not value.strip():
+                raise ValueError("localized narrative keys and values must be non-empty")
+        return values
 
 
 class PlanApproval(MissionModel):
@@ -380,6 +396,7 @@ class MissionDocument(MissionModel):
     status: str = Field(min_length=1)
     metadata: MissionMetadata
     payload: dict[str, Any]
+    localizations: list[MissionLocalization] = Field(default_factory=list)
     evidence: list[MissionEvidence] = Field(default_factory=list)
     history: list[MissionEvent] = Field(default_factory=list)
 
@@ -401,6 +418,23 @@ class MissionDocument(MissionModel):
             raise ValueError(f"invalid {self.kind} status: {self.status}")
         parsed = models[self.kind].model_validate(self.payload, strict=True)
         self.payload = parsed.model_dump(mode="python")
+        languages = [item.language for item in self.localizations]
+        if len(languages) != len(set(languages)):
+            raise ValueError("Mission localization languages must be unique")
+        for localization in self.localizations:
+            if (
+                localization.source_revision is not None
+                and localization.source_revision > self.revision
+            ):
+                raise ValueError("localization source revision cannot be newer than Mission revision")
+            invalid = [
+                key for key in localization.values
+                if not localization_key_allowed(self.kind, key)
+            ]
+            if invalid:
+                raise ValueError(
+                    f"invalid localized narrative keys for {self.kind}: {sorted(invalid)}"
+                )
         evidence_ids = [item.evidence_id for item in self.evidence]
         if len(evidence_ids) != len(set(evidence_ids)):
             raise ValueError("evidence IDs must be unique")
@@ -421,6 +455,136 @@ class MissionDocument(MissionModel):
         if referenced - known:
             raise ValueError(f"unknown mission evidence IDs: {sorted(referenced - known)}")
         return self
+
+
+_LOCALIZATION_KEY_PATTERNS: dict[str, tuple[str, ...]] = {
+    "research_report": (
+        r"summary", r"scope\.\d+", r"excluded_scope\.\d+",
+        r"findings\.[^.]+\.(?:title|detail)",
+        r"recommendations\.\d+", r"uncertainties\.\d+",
+    ),
+    "work_plan": (
+        r"objective", r"scope\.\d+", r"constraints\.\d+",
+        r"global_criteria\.[^.]+",
+        r"tasks\.[^.]+\.(?:title|instructions)",
+        r"tasks\.[^.]+\.criteria\.[^.]+",
+        r"tasks\.[^.]+\.(?:verification|authorization)\.\d+",
+    ),
+    "work_run": (
+        r"tasks\.[^.]+\.result", r"handoff\.current_state",
+        r"handoff\.(?:remaining_work|blockers)\.\d+",
+    ),
+    "knowledge_candidate": (r"reusable_summary",),
+}
+
+
+def localization_key_allowed(kind: str, key: str) -> bool:
+    return any(re.fullmatch(pattern, key) for pattern in _LOCALIZATION_KEY_PATTERNS[kind])
+
+
+def localization_values(document: MissionDocument, language: str) -> dict[str, str]:
+    return next(
+        (dict(item.values) for item in document.localizations if item.language == language),
+        {},
+    )
+
+
+def _criterion_source_text(value: CriterionInput) -> str:
+    return value.text if isinstance(value, Criterion) else value
+
+
+def mission_narrative_texts(document: MissionDocument) -> list[str]:
+    """Return source-language prose while excluding technical/audit fields."""
+    if document.kind == "research_report":
+        report = ResearchReportPayload.model_validate(document.payload)
+        return [
+            *report.scope,
+            *report.excluded_scope,
+            *[value for finding in report.findings for value in (finding.title, finding.detail)],
+            *report.recommendations,
+            *report.uncertainties,
+        ]
+    if document.kind == "work_plan":
+        plan = WorkPlanPayload.model_validate(document.payload)
+        return [
+            plan.objective,
+            *plan.scope,
+            *plan.constraints,
+            *[_criterion_source_text(value) for value in plan.acceptance_criteria],
+            *[
+                value
+                for task in plan.tasks
+                for value in (
+                    task.title,
+                    task.instructions,
+                    *[_criterion_source_text(item) for item in task.acceptance_criteria],
+                    *task.authorization,
+                )
+            ],
+        ]
+    if document.kind == "work_run":
+        run = WorkRunPayload.model_validate(document.payload)
+        texts = [state.result for state in run.task_states if state.result.strip()]
+        handoff = handoff_view(run.handoff)
+        texts.extend(filter(None, [
+            handoff["current_state"], *handoff["remaining_work"], *handoff["blockers"],
+        ]))
+        return texts
+    candidate = KnowledgeCandidatePayload.model_validate(document.payload)
+    return [candidate.reusable_summary]
+
+
+def validate_mission_authoring_quality(
+    document: MissionDocument, *, expected_language: str | None = None,
+) -> None:
+    """Validate readable source prose for newly-authored localized Missions."""
+    language = document.metadata.source_language
+    if language == "und":
+        return
+    if any(item.source_revision is None for item in document.localizations):
+        raise ValueError("localized Mission narratives require source_revision")
+    if expected_language and language != expected_language:
+        raise ValueError(
+            f"mission source language {language} does not match wiki authoring language "
+            f"{expected_language}"
+        )
+    if document.kind == "research_report":
+        report = ResearchReportPayload.model_validate(document.payload)
+        if not report.findings or not report.recommendations:
+            raise ValueError("research report requires readable findings and recommendations")
+        if any(len(finding.detail.strip()) < 20 for finding in report.findings):
+            raise ValueError("research finding detail must explain the finding")
+    if document.kind == "work_plan":
+        plan = WorkPlanPayload.model_validate(document.payload)
+        if len(plan.objective.strip()) < 20:
+            raise ValueError("work plan objective must be a readable summary")
+        if any(len(task.instructions.strip()) < 10 for task in plan.tasks):
+            raise ValueError("work plan task instructions must be readable")
+    texts = [text.strip() for text in mission_narrative_texts(document) if text.strip()]
+    if not texts:
+        return
+    korean = re.compile(r"[가-힣]")
+    latin = re.compile(r"[A-Za-z]")
+    for localization in document.localizations:
+        for value in localization.values.values():
+            if localization.language == "ko":
+                valid = bool(korean.search(value))
+            else:
+                valid = bool(latin.search(value)) and not korean.search(value)
+            if not valid:
+                raise ValueError(
+                    f"localized narrative does not match language "
+                    f"{localization.language}: {value[:80]}"
+                )
+    if language == "ko":
+        mismatched = [text for text in texts if not korean.search(text)]
+    else:
+        mismatched = [text for text in texts if not latin.search(text) or korean.search(text)]
+    if mismatched:
+        raise ValueError(
+            f"mission narrative does not match source language {language}: "
+            f"{mismatched[0][:80]}"
+        )
 
 
 def validate_transition(before: MissionDocument, after: MissionDocument, *, roles: set[str]) -> None:

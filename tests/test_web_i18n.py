@@ -3,7 +3,11 @@ from __future__ import annotations
 from ai_wiki.web import app
 
 
-def test_web_ui_defaults_to_korean():
+def test_web_ui_defaults_to_korean(wiki_root):
+    from ai_wiki.language import resolve_wiki_language
+
+    (wiki_root / ".ai-wiki.yaml").write_text("lang: ko\n", encoding="utf-8")
+    assert resolve_wiki_language(wiki_root).language == "ko"
     app.config["TESTING"] = True
     with app.test_client() as client:
         response = client.get("/create")
