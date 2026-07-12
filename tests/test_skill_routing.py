@@ -44,3 +44,8 @@ def test_skills_install_and_audit_all_agents(tmp_path, monkeypatch):
     assert result["status"] == "ok"
     assert len(result["skills"]) == 9
     assert result["routing"]["pass_rate"] == 1.0
+    for package_dir in packages:
+        spec = VariantSpec.from_manifest(package_dir / "variant.yaml")
+        primary = fake_home / ".gemini" / "config" / "skills" / spec.skill_name / "SKILL.md"
+        compatibility = fake_home / ".agents" / "skills" / spec.skill_name / "SKILL.md"
+        assert compatibility.read_bytes() == primary.read_bytes()

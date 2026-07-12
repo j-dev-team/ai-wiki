@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import shutil
 from pathlib import Path
 from typing import Any
@@ -74,9 +75,13 @@ def install_variant_skills(package_dir: Path, agents: tuple[str, ...]) -> dict[s
         if agent not in bases:
             raise ValueError(f"unsupported agent: {agent}")
         destination = bases[agent] / spec.skill_name
-        destination.mkdir(parents=True, exist_ok=True)
-        for source in skill_files:
-            shutil.copy2(source, destination / source.name)
+        destinations = [destination]
+        if agent == "gemini":
+            destinations.append(Path.home() / ".agents" / "skills" / spec.skill_name)
+        for target in destinations:
+            target.mkdir(parents=True, exist_ok=True)
+            for source in skill_files:
+                shutil.copy2(source, target / source.name)
         installed.append({"agent": agent, "path": str(destination)})
     config_path = package_dir / spec.config_filename
     config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
@@ -106,7 +111,29 @@ def audit_skill_installation(package_dirs: list[Path]) -> dict[str, Any]:
         for agent in config.get("agents") or []:
             path = bases[agent] / spec.skill_name
             exists = (path / "SKILL.md").exists()
-            rows.append({"package_name": spec.package_name, "agent": agent, "path": str(path), "exists": exists})
+            compatibility_paths = []
+            content_matches = True
+            if agent == "gemini":
+                compatibility = Path.home() / ".agents" / "skills" / spec.skill_name
+                compatibility_file = compatibility / "SKILL.md"
+                compatibility_exists = compatibility_file.exists()
+                compatibility_paths.append({"path": str(compatibility), "exists": compatibility_exists})
+                if exists and compatibility_exists:
+                    primary_hash = hashlib.sha256((path / "SKILL.md").read_bytes()).digest()
+                    compatibility_hash = hashlib.sha256(compatibility_file.read_bytes()).digest()
+                    content_matches = primary_hash == compatibility_hash
+                else:
+                    content_matches = False
+                if not compatibility_exists or not content_matches:
+                    missing.append(str(compatibility))
+            rows.append({
+                "package_name": spec.package_name,
+                "agent": agent,
+                "path": str(path),
+                "exists": exists,
+                "compatibility_paths": compatibility_paths,
+                "content_matches": content_matches,
+            })
             if not exists:
                 missing.append(str(path))
     routing = evaluate_skill_routing(package_dirs)

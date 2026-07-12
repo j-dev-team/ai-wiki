@@ -1,65 +1,240 @@
-title: AI Wiki 소개
-category: technology/ai
+schema_version: 2
+id: seed-replaced-during-init
+title: "__WIKI_DISPLAY_NAME__ 자기참조 문서: AI 중심 지식 백과사전의 구조와 운영 원칙"
+category: technology/ai/knowledge-systems
 tags:
-  - ai-wiki
-  - 지식관리
-  - 벡터검색
-  - cli
-  - 자기참조
-confidence: 0.95
-version: 1
+  - __WIKI_COMMAND_NAME__
+  - self-reference
+  - AI-first
+  - knowledge-base
+  - knowledge-graph
+  - YAML
+  - JSON-protocol
+  - hybrid-search
+  - vector-search
+  - citation
+  - RFC-6902
+  - local-first
+metadata:
+  confidence: 0.97
+  document_version: 1
+  created_at: "__NOW__"
+  modified_at: "__NOW__"
+  verified_at: "__NOW__"
+  author: __WIKI_COMMAND_NAME__
+  maturity: review
+  completeness: 0.98
 sources:
-  - https://github.com/j-dev-team/ai-wiki
-  - https://pypi.org/project/ai-wiki/
-author: ai-wiki
+  - id: src-readme
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/README.md
+    title: AI Wiki README
+    retrieved_at: "__NOW__"
+  - id: src-protocol
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/agent_protocol.py
+    title: AI Wiki agent protocol implementation
+    retrieved_at: "__NOW__"
+  - id: src-model
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/models.py
+    title: AI Wiki schema v2 document model
+    retrieved_at: "__NOW__"
+  - id: src-variants
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/docs/VARIANTS.md
+    title: Purpose-specific wiki guide
+    retrieved_at: "__NOW__"
+  - id: src-release
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/docs/RELEASE.ko.md
+    title: AI Wiki release workflow
+    retrieved_at: "__NOW__"
+  - id: src-pypi
+    url: https://pypi.org/project/ai-wiki/__ENGINE_VERSION__/
+    title: AI Wiki on PyPI
+    retrieved_at: "__NOW__"
+relations: []
 content:
   type: technology
-  what: >
-    AI Wiki는 AI 에이전트가 축적한 지식을 YAML 데이터로 저장·검색·관리하는 CLI 기반 구조화 지식 백과사전이다.
-    매 세션마다 같은 조사를 반복하는 문제를 해결하기 위해 만들어졌으며,
-    Karpathy의 LLM Wiki 아이디어에서 영감을 받았다.
-    독자·편집자·관리자가 모두 LLM이라는 점이 기존 위키와의 근본적 차이이다.
-  language: python
-  facts:
-    - Python 3.11+ + Click CLI + SQLite FTS5 + Flask 웹 UI + sqlite-vec 벡터 검색으로 구현
-    - Karpathy의 LLM Wiki 아이디어(2026-04)에서 영감. 마크다운이 아닌 구조화 YAML을 채택하여 AI 가독성 극대화
-    - "CLI 37개 명령: search, get, create, update, delete, verify, ingest, lint, gaps,
-      stale, history, reindex, quality, maintain, vsearch, vindex, backlinks,
-      sync-backlinks, similar, tags, tag, stats, discover, path, cluster, list,
-      init, destroy, upgrade-skill, export, export-all"
-    - "하이브리드 검색: FTS5 키워드 + 벡터(sentence-transformers/sqlite-vec) + RRF(Reciprocal Rank Fusion)로
-      hybrid_score 반환"
-    - "에이전트 스킬 3종: Claude Code(~/.claude/skills/), Antigravity CLI의 Gemini(~/.gemini/config/skills/),
-      GPT Codex(~/.codex/skills/) — init 시 선택적으로 설치"
-    - "init 대화형 절차: 언어(en/ko) -> 위키 이름 -> 에이전트 선택 -> 프리셋(general/tech/business/research)"
-    - "품질 게이트: content 키 5개 미만/200자 미만/출처 없으면 create 거부"
-    - "문서 성숙도: stub -> draft -> review -> mature (schemas.py 기반 completeness 계산)"
-    - 'Git 자동 커밋: create/update/delete 시 자동 커밋; 웹 UI 위키 이름 커스터마이징 지원'
-    - "배포: pip install ai-wiki (PyPI), MIT License, GitHub: j-dev-team/ai-wiki"
-  use_cases:
-    - 프로젝트 간 지식 재활용 — 한 번 조사한 내용을 어떤 세션에서도 즉시 검색
-    - 팩트 체크 — AI 학습 지식과 웹 검증 결과의 불일치를 _v로 추적
-    - 논쟁적 주제 관리 — disputes/historiography로 통설 변형 과정 기록
-    - 자동 품질 관리 — quality 게이트로 토막글 방지, maintain으로 정기 점검
-  limitations:
-    - 벡터 검색 첫 호출 시 모델 로딩 지연 (~3초)
-    - 로컬 전용 설계 — 인증/권한 없음, 외부 네트워크 노출 금지
-    - Python 3.11 이상 필요
-  current_state:
-    pypi: pip install ai-wiki
-    github: https://github.com/j-dev-team/ai-wiki
-    license: MIT
-    python_requires: ">=3.11"
-    cli_commands: 37
-    skill_agents:
-      - Claude Code
-      - Antigravity CLI의 Gemini
-      - GPT Codex
-  _meta:
-    maturity: mature
-    completeness: 0.92
-  _changelog:
-    - date: "2026-04-15T00:00:00Z"
-      action: created
-      fields: [what, facts, use_cases, limitations, current_state]
-      note: ai-wiki init 시 자동 생성된 시드 문서
+  data:
+    what: >-
+      __WIKI_DISPLAY_NAME__는 AI 에이전트가 세션과 프로젝트를 넘어 재사용할 지식을 검색하고,
+      근거와 함께 읽고, 검증된 부분 수정이나 신규 생성을 수행하도록 설계된 로컬 우선 구조화
+      백과사전이다. 표준 명령은 __WIKI_COMMAND_NAME__이다.
+    summary: >-
+      YAML 원본, FTS5·벡터·관계 검색, 근거 인용, 안전한 부분 수정과 목적별 격리를 제공한다.
+      외부 AI 에이전트가 추론하고 웹 UI는 인간 검토를 보조한다.
+    facts:
+      - "공용 엔진은 PyPI ai-wiki __ENGINE_VERSION__이며 AI 프로토콜 버전은 1.0이다."
+      - "모든 핵심 AI 응답은 protocol_version, status, data, meta, error 필드를 갖는다."
+      - "YAML 문서가 영속적 원본이고 SQLite wiki.db와 vectors.db는 파생 검색 인덱스다."
+      - "기본 검색은 FTS5 키워드 검색과 sentence-transformers 및 sqlite-vec 의미 검색을 RRF로 결합한다."
+      - "context는 검색 후보와 관계 문서를 결합해 기본 4000 estimated token 예산 안에서 반환한다."
+      - "인용은 doc:<문서ID>#<JSON Pointer> 형식으로 특정 데이터 경로를 가리킨다."
+      - "patch는 RFC 6902 일부 연산과 if-version 낙관적 동시성 제어를 사용한다."
+      - "기존 v1 문서는 조회 시 내부 v2로 정규화되고 수정된 문서만 v2로 저장된다."
+      - "목적별 위키는 공용 엔진을 공유하지만 문서, DB, 벡터 인덱스, 명령과 스킬을 격리한다."
+      - "웹 UI에는 인증과 권한 관리가 없으므로 로컬 사용만 전제한다."
+    mission:
+      primary: AI가 지식을 검색하고 근거를 추적하며 안전하게 축적하고 다시 활용하는 백과사전을 제공한다.
+      secondary: 인간이 문서, 출처, 검증 상태, 변경 이력과 사용 기록을 검토하게 한다.
+      non_goal: AI Wiki 내부 모델이 최종 추론이나 답변 생성을 수행하는 것은 목표가 아니다.
+    design_principles:
+      - "AI-first: 기본 인터페이스는 웹 화면이 아니라 결정적인 CLI JSON 프로토콜이다."
+      - "Evidence-linked: 지식은 문서 ID, JSON Pointer, 출처와 검증 수준으로 추적한다."
+      - "Local-first: 지식은 사용자 로컬 파일 시스템에 저장한다."
+      - "Structured source of truth: YAML 원본과 검색용 파생 인덱스의 책임을 분리한다."
+      - "Safe autonomy: AI 쓰기는 스키마, 버전 충돌, 보호 필드와 품질 규칙을 통과해야 한다."
+      - "Root isolation: 목적이 다른 위키의 문서, 인덱스와 사용 기록을 섞지 않는다."
+      - "Incremental evolution: 수정되는 문서부터 새 스키마로 전환한다."
+    architecture:
+      durable_storage: articles/<category>/<subcategory>/<slug>.yaml의 schema v2 YAML
+      metadata_index: data/wiki.db의 SQLite 메타데이터와 FTS5 전문 검색
+      vector_index: data/vectors.db의 sqlite-vec 임베딩과 벡터 메타데이터
+      source_archive: sources 디렉터리에 보관되는 수집 원문
+      operation_history: logs와 Git 자동 커밋에 남는 작업 이력
+      agent_interface: "__WIKI_COMMAND_NAME__ CLI와 protocol 1.0 JSON envelope"
+      human_interface: Flask 기반 로컬 웹 UI의 문서, 목록, 그래프와 검토 화면
+      shared_engine: PyPI ai-wiki 공용 엔진과 목적별 얇은 독립 패키지
+    ai_workflow:
+      - capabilities로 프로토콜, 명령, 스키마와 제한을 확인한다.
+      - context로 토큰 예산 내 근거 연결 컨텍스트를 검색한다.
+      - documents와 citations를 사용해 답변하고 citation key를 유지한다.
+      - record-use에 answered 또는 insufficient와 실제 사용 citation을 기록한다.
+      - 정보가 부족하면 권위 있는 외부 자료를 조사한다.
+      - 기존 문서는 get, dry-run patch, if-version patch 순서로 보강한다.
+      - 새 문서는 dry-run create 후 생성하고 duplicate_conflict를 명시적으로 해소한다.
+      - 저장 후 context를 다시 실행해 검색 결과와 citation 경로를 검증한다.
+    protocol_contract:
+      success: status가 ok이고 data에 결과가 있으며 error는 null이다.
+      failure: status가 error이고 data는 null이며 error에 code, message, retryable, details가 포함된다.
+      read_views: get은 compact, full, raw를 제공하며 기본값은 compact다.
+      field_projection: get --fields는 필요한 필드만 선택해 컨텍스트 소비를 줄인다.
+      token_estimation: 직렬화된 UTF-8 JSON 바이트 길이에 기반한 보수 추정기를 사용한다.
+    retrieval_pipeline:
+      candidate_generation: 하이브리드 검색에서 최대 20개 후보를 구한다.
+      fusion: FTS5 키워드 순위와 벡터 의미 순위를 Reciprocal Rank Fusion으로 결합한다.
+      relation_expansion: 상위 후보의 관련 문서를 추가해 연결 지식을 보완한다.
+      filtering: pending 미검증 초안은 기본 context에서 제외한다.
+      compaction: 제목, 요약, 사실, 한계, confidence, 버전, 출처와 citation을 우선한다.
+      budgeting: 값을 자르지 않고 예산을 넘는 낮은 우선순위 문서 전체를 제외한다.
+    document_model:
+      identity: id, title, category, tags가 식별과 분류를 담당한다.
+      metadata: confidence, document_version, 시각, 작성자, maturity와 completeness를 저장한다.
+      sources: 각 출처는 source id, HTTP(S) URL, 제목과 조회 시각을 가진다.
+      relations: target_id, 유형, 방향, 가중치와 근거 source id를 가진다.
+      content: 등록된 content type과 구조화 data를 분리한다.
+      verification: JSON Pointer 경로별 검증 수준, 출처와 검증 시각을 저장한다.
+      history: 변경 작업을 사용자 지식 본문과 분리해 기록한다.
+      extensions: 핵심 스키마를 오염시키지 않고 목적별 확장을 수용한다.
+    write_safety:
+      - patch를 메모리 복사본에 적용한 뒤 스키마와 품질을 검사한다.
+      - if-version 불일치는 version_conflict와 현재 버전을 반환하며 자동 재시도하지 않는다.
+      - test 실패, 잘못된 경로, 보호 필드 수정과 허용되지 않은 연산을 거부한다.
+      - 임시 파일과 원자적 교체를 사용하고 YAML, SQLite와 벡터 인덱스를 동기화한다.
+      - 출처 참조, 관계 대상, 날짜와 필드 타입을 검증한다.
+      - 삭제는 AI 자율 작업에서 제외하고 사용자의 명시적 요청과 confirm을 요구한다.
+    verification_policy:
+      levels: [unverified, sourced, verified, corroborated, disputed, human_verified]
+      source_free_rule: 출처 없는 지식은 confidence 0.5 이하의 pending 미검증 초안으로만 자율 저장한다.
+      normal_retrieval: pending 초안은 기본 context에서 제외된다.
+      citation_integrity: 현재 context가 발급하지 않은 citation은 record-use에서 거부된다.
+      quality_dimensions: 구조, 내용량, 출처, 태그, 관계, confidence와 검증률을 종합한다.
+    purpose_specific_wikis:
+      reason: 목적과 보안 경계가 다른 지식을 한 루트에 섞지 않기 위해 사용한다.
+      presets: [general, law, labor, tax, business, research, personal]
+      custom_manifest: 기본 범주 밖의 위키는 이름, 도메인, 명령, 설명과 trigger를 정의한 manifest로 만든다.
+      isolation: 각 패키지는 독립된 YAML, SQLite DB, 벡터 DB, 웹 포트와 스킬을 사용한다.
+      lifecycle: 설치, 백업, 복원, 업그레이드, 마이그레이션, 격리와 스킬 라우팅 감사를 지원한다.
+    agent_integrations:
+      codex: 사용자 SKILL.md를 통해 JSON 프로토콜을 실행한다.
+      gemini: Antigravity CLI의 Gemini 스킬에서 동일한 프로토콜을 사용한다.
+      claude: Claude Code 스킬 형식을 지원한다.
+      shared_rule: 에이전트와 무관하게 capabilities, context, citation, record-use, patch 또는 create 순서를 공유한다.
+    human_role:
+      - AI가 생성한 지식을 읽고 검토한다.
+      - 검증 대기 문서와 출처, confidence, maturity를 확인한다.
+      - 관계 그래프, 변경 이력과 실제 사용 기록을 감사한다.
+      - 고위험 판단이나 삭제처럼 AI 자율 범위 밖 작업을 명시적으로 승인한다.
+      - 웹 UI는 AI 프로토콜의 대체물이 아니라 검토용 보조 인터페이스다.
+    current_release:
+      engine_version: __ENGINE_VERSION__
+      protocol_version: "1.0"
+      distribution: [GitHub, PyPI]
+      install_command: pip install ai-wiki
+      wiki_command: __WIKI_COMMAND_NAME__
+      local_vector_requirement: 문서 수와 벡터 수가 일치하고 vector.ready가 true여야 한다.
+    use_cases:
+      - 반복 조사한 지식과 오류 해결 방법의 세션 간 재사용
+      - 출처와 검증 경로가 필요한 연구 축적
+      - 여러 AI 에이전트의 로컬 근거 저장소 공유
+      - 목적별 독립 위키를 통한 업무 영역과 민감 정보 격리
+    limitations:
+      - 인증과 권한 관리가 없어 외부 네트워크에 공개하면 안 된다.
+      - 로컬 문서와 데이터베이스는 기본적으로 암호화되지 않는다.
+      - 최종 답변 정확성은 에이전트 추론과 입력 출처 품질에도 의존한다.
+      - 최초 벡터 모델 준비에는 다운로드와 추가 디스크 공간이 필요할 수 있다.
+      - 오래된 지식은 재검증해야 한다.
+    best_practices:
+      - 답변 전 context를 실행하고 반환된 citation만 사용한다.
+      - 안정적인 핵심 지식과 자주 변하는 시계열 정보를 분리한다.
+      - 출처를 주장 경로와 verification source_ids로 연결한다.
+      - 부분 수정은 get, dry-run patch, if-version patch 순서로 수행한다.
+      - doctor에서 문서 수와 벡터 수 일치 및 vector.ready를 확인한다.
+    when_to_use:
+      - 여러 세션과 프로젝트에서 반복 사용할 지식이 있을 때
+      - AI가 근거와 문서 버전을 추적하면서 지식을 부분 갱신해야 할 때
+      - 로컬에서 통제 가능한 AI용 백과사전과 의미 검색이 필요할 때
+    when_not_to_use:
+      - 인증, 권한과 암호화가 필요한 공개 다중 사용자 서비스의 직접 백엔드
+      - 재사용 가치가 전혀 없는 일회성 임시 대화
+      - 출처 검증 없이 확정 사실로 배포해야 하는 고위험 자동 의사결정
+verification:
+  - path: /content/data/what
+    level: verified
+    source_ids: [src-readme]
+    verified_at: "__NOW__"
+    note: 공식 목적과 대조
+  - path: /content/data/facts
+    level: corroborated
+    source_ids: [src-readme, src-protocol, src-model, src-variants, src-pypi]
+    verified_at: "__NOW__"
+    note: 문서, 구현과 배포를 교차 확인
+  - path: /content/data/architecture
+    level: verified
+    source_ids: [src-readme, src-protocol, src-model]
+    verified_at: "__NOW__"
+    note: 저장 구조와 구현 대조
+  - path: /content/data/ai_workflow
+    level: verified
+    source_ids: [src-readme, src-protocol]
+    verified_at: "__NOW__"
+    note: 공식 흐름과 프로토콜 구현 대조
+  - path: /content/data/document_model
+    level: verified
+    source_ids: [src-readme, src-model]
+    verified_at: "__NOW__"
+    note: schema v2와 모델 구현 대조
+  - path: /content/data/purpose_specific_wikis
+    level: verified
+    source_ids: [src-variants]
+    verified_at: "__NOW__"
+    note: 공식 variants 가이드 기반
+  - path: /content/data/current_release
+    level: corroborated
+    source_ids: [src-release, src-pypi, src-readme]
+    verified_at: "__NOW__"
+    note: 릴리스 문서와 배포 페이지 대조
+  - path: /content/data/limitations
+    level: sourced
+    source_ids: [src-readme, src-release]
+    verified_at: "__NOW__"
+    note: 보안 공지와 릴리스 정책 반영
+history:
+  - at: "__NOW__"
+    action: created
+    fields: [title, category, tags, metadata, sources, content, verification]
+    note: 설치 과정에서 자동 생성된 자기참조 seed 문서
+extensions:
+  self_reference:
+    subject: __WIKI_COMMAND_NAME__
+    engine: ai-wiki
+    engine_version: __ENGINE_VERSION__
+    protocol: "1.0"
+    generated_during_init: true

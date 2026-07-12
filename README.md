@@ -113,6 +113,7 @@ See [Purpose-Specific Wikis](https://github.com/j-dev-team/ai-wiki/blob/master/d
 2. **Wiki Name** — Displayed in the web UI header (saved in `.ai-wiki.yaml`)
 3. **Agent Selection** — Choose which AI agents you use (default: Claude Code)
 4. **Preset Selection** — Category structure matching your wiki's purpose
+5. **Self-Reference Seed** — Creates a detailed schema-v2 document with the wiki architecture, AI workflow, sources, verification paths, safety policy, and current engine version
 
 **Agent Selection UI:**
 

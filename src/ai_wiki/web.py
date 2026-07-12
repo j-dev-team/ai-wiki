@@ -13,7 +13,7 @@ from ai_wiki.index import WikiIndex
 from ai_wiki.i18n import LANG_LABELS, SUPPORTED_LANGS, default_lang, translate
 from ai_wiki.models import Article
 from ai_wiki.catalog import rebuild_catalog
-from ai_wiki.schemas import TYPE_SCHEMAS, build_content_template
+from ai_wiki.schemas import TYPE_SCHEMAS, build_content_template, register_custom_types
 from ai_wiki.storage import (
     get_wiki_root,
     list_all_articles,
@@ -83,30 +83,33 @@ _wiki_index: WikiIndex | None = None
 
 def get_index() -> WikiIndex:
     global _wiki_index
+    register_custom_types(get_wiki_root() / _RUNTIME.config_filename, reset=True)
     if _wiki_index is None:
         _wiki_index = WikiIndex()
     return _wiki_index
 
 
 def _vector_upsert(article: Article) -> None:
-    """Keep vector search in sync without breaking web writes if model loading fails."""
+    """Keep vector search synchronized with document writes."""
+    vidx = None
     try:
         from ai_wiki.vector import VectorIndex
         vidx = VectorIndex()
         vidx.upsert(article)
-        vidx.close()
-    except Exception:
-        pass
+    finally:
+        if vidx is not None:
+            vidx.close()
 
 
 def _vector_remove(article_id: str) -> None:
+    vidx = None
     try:
         from ai_wiki.vector import VectorIndex
         vidx = VectorIndex()
         vidx.remove(article_id)
-        vidx.close()
-    except Exception:
-        pass
+    finally:
+        if vidx is not None:
+            vidx.close()
 
 
 # ── Jinja Filters ──────────────────────────────────
@@ -214,9 +217,11 @@ def create_article():
         )
 
         idx = get_index()
-        atomic_save(article, idx)
+        atomic_save(
+            article, idx,
+            vector_upsert=_vector_upsert, vector_remove=_vector_remove,
+        )
         rebuild_catalog()
-        _vector_upsert(article)
         flash(f"문서가 생성되었습니다: {title}", "success")
         return redirect(url_for("view_article", article_id=article_id))
 
@@ -260,9 +265,11 @@ def edit_article(article_id: str):
         article.last_modified = datetime.now(timezone.utc)
 
         idx = get_index()
-        atomic_update(article, old_path, idx)
+        atomic_update(
+            article, old_path, idx,
+            vector_upsert=_vector_upsert, vector_remove=_vector_remove,
+        )
         rebuild_catalog()
-        _vector_upsert(article)
         flash("문서가 수정되었습니다.", "success")
         return redirect(url_for("view_article", article_id=article_id))
 
@@ -472,9 +479,11 @@ def api_create():
     )
 
     idx = get_index()
-    atomic_save(article, idx)
+    atomic_save(
+        article, idx,
+        vector_upsert=_vector_upsert, vector_remove=_vector_remove,
+    )
     rebuild_catalog()
-    _vector_upsert(article)
     return jsonify({"status": "ok", "action": "created", "article_id": article_id}), 201
 
 
@@ -512,9 +521,11 @@ def api_update(article_id: str):
     article.last_modified = datetime.now(timezone.utc)
 
     idx = get_index()
-    atomic_update(article, old_path, idx)
+    atomic_update(
+        article, old_path, idx,
+        vector_upsert=_vector_upsert, vector_remove=_vector_remove,
+    )
     rebuild_catalog()
-    _vector_upsert(article)
     return jsonify({"status": "ok", "action": "updated", "article_id": article_id, "version": article.version})
 
 

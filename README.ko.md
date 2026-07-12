@@ -26,6 +26,9 @@ Python 3.11 이상이 필요합니다.
 ```powershell
 python -m pip install ai-wiki
 ai-wiki init D:\wiki\my-wiki
+
+# 초기화 시 위키 구조, AI 작업 흐름, 출처와 검증 경로를 설명하는
+# 상세 schema v2 자기참조 문서가 자동으로 생성됩니다.
 ```
 
 기존 설치본 업그레이드:

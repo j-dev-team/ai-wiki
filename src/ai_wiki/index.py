@@ -20,6 +20,7 @@ class WikiIndex:
         self.conn.execute("PRAGMA journal_mode = WAL")
         self.initialize()
         self._reconcile_pending_updates()
+        self._reconcile_pending_vectors()
 
     def initialize(self) -> None:
         cur = self.conn.cursor()
@@ -153,6 +154,35 @@ class WikiIndex:
                 marker.unlink(missing_ok=True)
             except Exception:
                 self.conn.rollback()
+
+    def _reconcile_pending_vectors(self) -> None:
+        """Finish vector writes interrupted after the YAML and SQLite commit."""
+        import json
+        from ai_wiki.storage import _load_yaml_file, get_wiki_root
+
+        pending_dir = self.db_path.parent / "pending-vector"
+        if not pending_dir.exists():
+            return
+        root = get_wiki_root().resolve()
+        for marker in pending_dir.glob("*.json"):
+            vector_index = None
+            try:
+                payload = json.loads(marker.read_text(encoding="utf-8"))
+                path = (root / payload["file_path"]).resolve()
+                path.relative_to(root)
+                data = _load_yaml_file(path) if path.exists() else None
+                if not data or data.get("id") != payload.get("article_id"):
+                    marker.unlink(missing_ok=True)
+                    continue
+                from ai_wiki.vector import VectorIndex
+                vector_index = VectorIndex(db_path=self.db_path.parent / "vectors.db")
+                vector_index.upsert(Article.from_yaml(data))
+                marker.unlink(missing_ok=True)
+            except Exception:
+                continue
+            finally:
+                if vector_index is not None:
+                    vector_index.close()
 
     def upsert(self, article: Article, file_path: str = "") -> None:
         cur = self.conn.cursor()

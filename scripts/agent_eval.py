@@ -219,7 +219,7 @@ def _command(agent: str, root: Path, schema_path: Path, final_file: Path) -> lis
                 "--json-schema", json.dumps(_schema()), "--max-budget-usd", "2.00"]
     if agent == "gemini":
         return [executable, "--print", prompt, "--dangerously-skip-permissions",
-                "--print-timeout", "15m"]
+                "--print-timeout", "20m"]
     raise ValueError(agent)
 
 

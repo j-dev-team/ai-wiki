@@ -1,0 +1,58 @@
+{
+  "status": "ok",
+  "passed_tasks": 12,
+  "total_tasks": 12,
+  "agents": [
+    {
+      "passed": true,
+      "checks": {
+        "reported_all_tasks": true,
+        "capabilities_called": true,
+        "context_called": true,
+        "all_get_views_called": true,
+        "usage_recorded": true,
+        "patch_dry_and_apply_called": true,
+        "create_called": true,
+        "unverified_override_called": true,
+        "legacy_unchanged": true,
+        "patch_applied_once": true,
+        "usage_persisted": true,
+        "pending_draft_created": true
+      },
+      "result": {
+        "passed_tasks": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ],
+        "citation": "doc:tech-live-agent-eval-abc123#/content/data/facts",
+        "notes": [
+          "1단계: 지식백과(ai-wiki)의 전체적인 기능(capabilities)들을 확인했습니다.",
+          "2단계: 'quantumwidget'이라는 키워드로 검색을 수행하여 고유번호(context_id)와 출처 증거(citation) 정보를 확보했습니다.",
+          "3단계: 특정 문서(tech-live-agent-eval-abc123)를 요약 모드로 읽어서 내용을 확인했습니다.",
+          "4단계: 해당 문서를 전체 모드(--view full)로 상세하게 조회했습니다.",
+          "5단계: 해당 문서의 원래 원본 데이터 형태(--view raw)로 상세하게 조회했습니다.",
+          "6단계: 문서에서 아이디, 제목, 사실 정보, 출처 등 원하는 특정 정보 필드들만 골라서 조회했습니다.",
+          "7단계: 2단계에서 확보했던 출처 증거 정보를 공식적으로 사용했다고 기록(record-use)하고 답변 완료(answered) 처리했습니다.",
+          "8단계: 모의 테스트(--dry-run)를 진행하여 문서를 수정하는 패치(patch)를 미리 연습 적용해 보았습니다.",
+          "9단계: 실제로 문서를 수정하는 패치를 진짜로 적용해서 새로운 버전(버전 2)으로 업데이트했습니다.",
+          "10단계: 예전 버전(버전 1) 정보로 다시 수정을 시도하여, 이미 문서가 다른 사람(또는 작업)에 의해 변경되었다는 충돌 에러(version_conflict)를 정상적으로 감지했습니다.",
+          "11단계: 새로운 임시 글(draft.json)을 등록하여 검증 대기(pending) 상태로 만들고, 출처 정보가 없어 신뢰도 점수(confidence)가 0.5 이하로 낮아지는 것을 확인했습니다.",
+          "12단계: 기본 검색 시에는 검증되지 않은 임시 글이 제외되고, 검증되지 않은 글 포함 옵션(--include-unverified)을 주었을 때는 정상적으로 검색 결과에 포함되는 것을 각각 테스트하여 검증했습니다."
+        ]
+      },
+      "agent": "gemini",
+      "exit_code": 0,
+      "root": "D:\\dev\\ai-wiki-dev\\tmp\\agent-eval\\gemini"
+    }
+  ]
+}

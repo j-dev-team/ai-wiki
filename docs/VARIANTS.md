@@ -24,6 +24,7 @@ ai-wiki variant install law-wiki `
 ```
 
 The command generates and installs the thin package, initializes its isolated root, installs the selected skill, builds the vector index, and runs `doctor`.
+Initialization also creates a detailed schema-v2 self-reference document customized with the variant display name and command. The upstream AI Wiki source URLs remain unchanged, while metadata, sources, verification paths, and history are preserved.
 
 ```powershell
 law-wiki doctor

@@ -110,6 +110,15 @@ def test_context_budget_citations_and_record_use(wiki_root, wiki_index):
     assert citation["document_id"] == article.id
     assert citation["path"] == "/content/data/facts"
     assert citation["source_ids"] == ["src-1"]
+    for issued in envelope["data"]["citations"]:
+        document = next(
+            item for item in envelope["data"]["documents"]
+            if item["id"] == issued["document_id"]
+        )
+        parts = issued["path"].strip("/").split("/")
+        assert parts[:2] == ["content", "data"]
+        represented_key = parts[2].replace("~1", "/").replace("~0", "~")
+        assert represented_key in document["content"]
 
     usage = _run([
         "record-use", envelope["data"]["context_id"],
@@ -123,6 +132,28 @@ def test_context_budget_citations_and_record_use(wiki_root, wiki_index):
     ], wiki_root)
     assert invalid.exit_code == 1
     assert json.loads(invalid.output)["error"]["code"] == "invalid_citation"
+
+
+def test_context_includes_query_relevant_nonstandard_field(wiki_root, wiki_index):
+    article = _article(marker="architecturemarker")
+    article.content["architecture"] = {
+        "layers": ["YAML source", "SQLite retrieval", "vector retrieval"],
+    }
+    article.verification.append({
+        "path": "/content/data/architecture",
+        "level": "verified",
+        "source_ids": ["src-1"],
+    })
+    _index_article(wiki_index, article)
+
+    envelope = json.loads(_run(["context", "architecture"], wiki_root).output)
+    document = envelope["data"]["documents"][0]
+
+    assert document["content"]["architecture"]["layers"][0] == "YAML source"
+    assert any(
+        item["path"] == "/content/data/architecture"
+        for item in envelope["data"]["citations"]
+    )
 
 
 def test_context_excludes_pending_draft_by_default(wiki_root, wiki_index):
@@ -164,6 +195,87 @@ def test_recall_at_five_is_perfect_for_synthetic_exact_queries(wiki_root, wiki_i
     for marker, article_id in expected.items():
         results = wiki_index.search(marker, limit=5)
         assert article_id in [item["id"] for item in results]
+
+
+def test_context_interleaves_related_documents_before_limit(wiki_root, wiki_index):
+    related = _article(
+        "tech-related-detail-abc123", title="Related Detail", marker="zzrelationquery",
+    )
+    hub = _article(
+        "tech-related-hub-abc123", title="zzrelationquery",
+        marker=" ".join(["zzrelationquery"] * 8),
+    )
+    hub.related = [related.id]
+    _index_article(wiki_index, related)
+    _index_article(wiki_index, hub)
+    for number in range(10):
+        distractor = _article(
+            f"tech-relation-distractor-{number}-abc123",
+            title=f"Distractor {number}", marker=f"zzrelationquery distractor {number}",
+        )
+        _index_article(wiki_index, distractor)
+
+    envelope = json.loads(_run([
+        "context", "zzrelationquery", "--limit", "3", "--max-tokens", "4000",
+    ], wiki_root).output)
+    documents = envelope["data"]["documents"]
+
+    assert hub.id in [item["id"] for item in documents]
+    relation = next(item for item in documents if item["id"] == related.id)
+    assert relation["selection_reason"] == f"related:{hub.id}"
+
+
+def test_vector_failure_rolls_back_ai_create(wiki_root, tmp_path):
+    payload = {
+        "title": "Vector Rollback Subject",
+        "category": "technology/agents",
+        "tags": ["vector", "rollback"],
+        "confidence": 0.9,
+        "sources": ["https://example.com/vector-rollback"],
+        "content": _article(marker="vectorrollback").content,
+    }
+    document = tmp_path / "vector-rollback.json"
+    document.write_text(json.dumps(payload), encoding="utf-8")
+
+    with patch("ai_wiki.cli._vector_upsert", side_effect=RuntimeError("injected vector failure")):
+        result = _run(["create", "--document-file", str(document)], wiki_root)
+
+    response = json.loads(result.output)
+    assert result.exit_code == 1
+    assert response["error"]["code"] == "storage_failed"
+    assert list((wiki_root / "articles").rglob("*.yaml")) == []
+    index = WikiIndex(wiki_root / "data" / "wiki.db")
+    try:
+        assert index.count() == 0
+    finally:
+        index.close()
+
+
+def test_vector_failure_rolls_back_ai_patch(wiki_root, wiki_index, tmp_path):
+    article = _article()
+    path = _index_article(wiki_index, article)
+    before = path.read_bytes()
+    operations = tmp_path / "vector-patch.json"
+    operations.write_text(json.dumps([
+        {"op": "add", "path": "/content/data/facts/-", "value": "Must be rolled back"},
+    ]), encoding="utf-8")
+
+    with patch(
+        "ai_wiki.cli._vector_upsert",
+        side_effect=[RuntimeError("injected vector failure"), None],
+    ):
+        result = _run([
+            "patch", article.id, "--operations-file", str(operations), "--if-version", "1",
+        ], wiki_root)
+
+    response = json.loads(result.output)
+    assert result.exit_code == 1
+    assert response["error"]["code"] == "storage_failed"
+    assert path.read_bytes() == before
+    restored = load_article_with_path(article.id)[0]
+    assert restored is not None
+    assert restored.version == 1
+    assert "Must be rolled back" not in restored.content["facts"]
 
 
 def test_patch_dry_run_apply_conflict_and_protected_field(wiki_root, wiki_index, tmp_path):

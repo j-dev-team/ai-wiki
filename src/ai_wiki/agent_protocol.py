@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import json
 import math
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -81,13 +82,16 @@ def is_unverified_draft(article: Article) -> bool:
 
 
 def compact_document(article: Article, *, score: float | None = None,
-                     selection_reason: str | None = None) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+                     selection_reason: str | None = None,
+                     query: str | None = None) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     canonical = canonical_document(article)
     content_data = canonical["content"]["data"]
-    compact_content = {
-        key: copy.deepcopy(content_data[key])
-        for key in COMPACT_CONTENT_PRIORITY if key in content_data
-    }
+    compact_content: dict[str, Any] = {}
+    for key in _query_relevant_content_keys(content_data, query):
+        compact_content[key] = copy.deepcopy(content_data[key])
+    for key in COMPACT_CONTENT_PRIORITY:
+        if key in content_data and key not in compact_content:
+            compact_content[key] = copy.deepcopy(content_data[key])
     if not compact_content:
         for key in list(content_data)[:5]:
             compact_content[key] = copy.deepcopy(content_data[key])
@@ -111,27 +115,39 @@ def compact_document(article: Article, *, score: float | None = None,
     for verification in canonical.get("verification", []):
         valid_ids = [item for item in verification.get("source_ids", []) if item in source_ids]
         path = verification.get("path", "/content/data")
-        if not pointer_exists(path):
-            continue
-        key = f"doc:{article.id}#{path}"
-        if key in seen:
-            continue
-        seen.add(key)
-        citations.append({
-            "key": key,
-            "document_id": article.id,
-            "path": path,
-            "level": verification.get("level", "unverified"),
-            "source_ids": valid_ids,
-        })
+        if path == "/content/data":
+            paths = [f"/content/data/{_encode_pointer_part(key)}" for key in compact_content]
+        else:
+            parts = _decode_pointer(path)
+            paths = [path] if (
+                len(parts) >= 3
+                and parts[:2] == ["content", "data"]
+                and parts[2] in compact_content
+            ) else []
+        for represented_path in paths:
+            if not pointer_exists(represented_path):
+                continue
+            key = f"doc:{article.id}#{represented_path}"
+            if key in seen:
+                continue
+            seen.add(key)
+            citations.append({
+                "key": key,
+                "document_id": article.id,
+                "path": represented_path,
+                "level": verification.get("level", "unverified"),
+                "source_ids": valid_ids,
+            })
     if not citations and sources:
-        citations.append({
-            "key": f"doc:{article.id}#/content/data",
-            "document_id": article.id,
-            "path": "/content/data",
-            "level": "sourced",
-            "source_ids": sorted(source_ids),
-        })
+        for content_key in compact_content:
+            path = f"/content/data/{_encode_pointer_part(content_key)}"
+            citations.append({
+                "key": f"doc:{article.id}#{path}",
+                "document_id": article.id,
+                "path": path,
+                "level": "sourced",
+                "source_ids": sorted(source_ids),
+            })
 
     document = {
         "id": article.id,
@@ -189,23 +205,40 @@ def build_context(index, query: str, *, max_tokens: int = DEFAULT_CONTEXT_TOKENS
         raise ProtocolFailure("invalid_limit", "limit must be between 1 and 50")
 
     ranked = index.search(query, category=category, tags=tags, limit=20)
-    candidates: list[tuple[Article, float, str]] = []
+    direct_candidates: list[tuple[Article, float, str]] = []
     seen: set[str] = set()
     for result in ranked:
         article = load_article(result["id"])
         if not article or article.id in seen:
             continue
         seen.add(article.id)
-        candidates.append((article, float(result.get("hybrid_score", 0.0)), "hybrid"))
+        direct_candidates.append((article, float(result.get("hybrid_score", 0.0)), "hybrid"))
 
-    for article, score, _ in list(candidates[:5]):
+    direct_by_id = {article.id: (article, score, reason) for article, score, reason in direct_candidates}
+    related_by_parent: dict[str, list[tuple[Article, float, str]]] = {}
+    promoted_relations: set[str] = set()
+    for article, score, _ in direct_candidates[:5]:
         for relation_id in article.related:
-            if relation_id in seen:
+            if relation_id in promoted_relations or relation_id == article.id:
                 continue
-            related = load_article(relation_id)
+            direct_relation = direct_by_id.get(relation_id)
+            related = direct_relation[0] if direct_relation else load_article(relation_id)
             if related:
-                seen.add(related.id)
-                candidates.append((related, score * 0.5, f"related:{article.id}"))
+                promoted_relations.add(related.id)
+                related_by_parent.setdefault(article.id, []).append(
+                    (
+                        related,
+                        max(score * 0.75, direct_relation[1] if direct_relation else 0.0),
+                        f"related:{article.id}",
+                    )
+                )
+
+    candidates: list[tuple[Article, float, str]] = []
+    for article, score, reason in direct_candidates:
+        if article.id in promoted_relations:
+            continue
+        candidates.append((article, score, reason))
+        candidates.extend(related_by_parent.get(article.id, []))
 
     context_id = uuid.uuid4().hex
     documents: list[dict[str, Any]] = []
@@ -220,7 +253,7 @@ def build_context(index, query: str, *, max_tokens: int = DEFAULT_CONTEXT_TOKENS
             excluded_unverified += 1
             continue
         document, document_citations = compact_document(
-            article, score=round(score, 6), selection_reason=reason,
+            article, score=round(score, 6), selection_reason=reason, query=query,
         )
         trial_data = {
             "context_id": context_id,
@@ -276,6 +309,28 @@ def _decode_pointer(path: str) -> list[str]:
     if not path.startswith("/"):
         raise ProtocolFailure("invalid_patch", f"JSON Pointer must start with '/': {path}")
     return [part.replace("~1", "/").replace("~0", "~") for part in path[1:].split("/")]
+
+
+def _encode_pointer_part(value: str) -> str:
+    return value.replace("~", "~0").replace("/", "~1")
+
+
+def _query_relevant_content_keys(content: dict[str, Any], query: str | None) -> list[str]:
+    if not query:
+        return []
+    tokens = [token for token in re.findall(r"[\w-]+", query.casefold()) if len(token) >= 3]
+    if not tokens:
+        return []
+    ranked: list[tuple[int, int, str]] = []
+    for position, (key, value) in enumerate(content.items()):
+        key_text = key.casefold()
+        value_text = json.dumps(value, ensure_ascii=False, separators=(",", ":")).casefold()
+        score = sum(4 for token in tokens if token in key_text)
+        score += sum(1 for token in tokens if token in value_text)
+        if score:
+            ranked.append((score, -position, key))
+    ranked.sort(reverse=True)
+    return [key for _, _, key in ranked[:3]]
 
 
 def _parent_for(document: Any, path: str) -> tuple[Any, str]:

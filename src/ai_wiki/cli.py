@@ -128,7 +128,13 @@ def msg(key: str, *args) -> str:
 from ai_wiki.index import WikiIndex
 from ai_wiki.models import Article
 from ai_wiki.quality import validate as quality_validate
-from ai_wiki.schemas import TYPE_SCHEMAS, build_content_template, compute_completeness, determine_maturity
+from ai_wiki.schemas import (
+    TYPE_SCHEMAS,
+    build_content_template,
+    compute_completeness,
+    determine_maturity,
+    register_custom_types,
+)
 from ai_wiki.storage import (
     atomic_save,
     atomic_update,
@@ -206,13 +212,13 @@ def _check_skill_update() -> None:
 def cli(ctx):
     """AI Knowledge Wiki - Structured knowledge document management CLI"""
     ctx.ensure_object(dict)
+    register_custom_types(get_wiki_root() / CONFIG_FILENAME, reset=True)
     # init/destroy commands may run without a wiki, so skip index creation
     if ctx.invoked_subcommand in ("init", "destroy", "upgrade-skill", "quickstart", "template", "create-template", "variant"):
         return
     ctx.obj["index"] = WikiIndex()
     ctx.call_on_close(ctx.obj["index"].close)
     migrate_legacy_log()
-    _check_skill_update()
 
 
 # ── Init ─────────────────────────────────────────────────
@@ -265,11 +271,14 @@ def _install_skills_for_agents(agents: "list[str]", wiki_name: str, skill_files:
         path_fn = _AGENT_SKILL_PATHS.get(agent)
         if path_fn is None:
             continue
-        skill_dir = path_fn(wiki_name)
-        skill_dir.mkdir(parents=True, exist_ok=True)
-        for src in skill_files:
-            shutil.copy2(src, skill_dir / src.name)
-        installed_dirs.append(str(skill_dir))
+        destinations = [path_fn(wiki_name)]
+        if agent == "gemini":
+            destinations.append(_LEGACY_AGENT_SKILL_PATHS["gemini"][0](wiki_name))
+        for skill_dir in destinations:
+            skill_dir.mkdir(parents=True, exist_ok=True)
+            for src in skill_files:
+                shutil.copy2(src, skill_dir / src.name)
+            installed_dirs.append(str(skill_dir))
     return installed_dirs
 
 
@@ -307,8 +316,21 @@ def _create_seed_document(wiki_root: "Path", lang: str) -> bool:
     except Exception:
         return False
 
+    previous_root = os.environ.get("AI_WIKI_ROOT")
+    os.environ["AI_WIKI_ROOT"] = str(wiki_root)
     try:
-        if DISPLAY_NAME != "AI Wiki":
+        from ai_wiki import __version__
+
+        now_text = utc_now_text()
+        uses_placeholders = "__WIKI_DISPLAY_NAME__" in seed_text
+        seed_text = (
+            seed_text
+            .replace("__WIKI_DISPLAY_NAME__", DISPLAY_NAME)
+            .replace("__WIKI_COMMAND_NAME__", COMMAND_NAME)
+            .replace("__ENGINE_VERSION__", __version__)
+            .replace("__NOW__", now_text)
+        )
+        if not uses_placeholders and DISPLAY_NAME != "AI Wiki":
             seed_text = seed_text.replace("AI Wiki", DISPLAY_NAME).replace("ai-wiki", COMMAND_NAME)
         data = yaml.safe_load(seed_text)
         if not isinstance(data, dict):
@@ -320,7 +342,7 @@ def _create_seed_document(wiki_root: "Path", lang: str) -> bool:
         # Check if a document with this title already exists
         from ai_wiki.index import WikiIndex as _WikiIndex
         _idx = _WikiIndex(db_path=wiki_root / "data" / "wiki.db")
-        existing = _idx.search(title, limit=5)
+        existing = _idx.get_all_articles_meta(sort="title")
         for row in existing:
             if row.get("title") == title:
                 _idx.close()
@@ -328,18 +350,22 @@ def _create_seed_document(wiki_root: "Path", lang: str) -> bool:
         _idx.close()
 
         article_id = generate_id(title, category)
-        article = Article(
-            id=article_id,
-            title=title,
-            category=category,
-            content=data.get("content", {}),
-            tags=data.get("tags", []),
-            confidence=data.get("confidence", 0.95),
-            version=data.get("version", 1),
-            sources=data.get("sources", []),
-            related=[],
-            author=data.get("author", COMMAND_NAME),
-        )
+        if data.get("schema_version") == 2:
+            data["id"] = article_id
+            article = Article.from_yaml(data)
+        else:
+            article = Article(
+                id=article_id,
+                title=title,
+                category=category,
+                content=data.get("content", {}),
+                tags=data.get("tags", []),
+                confidence=data.get("confidence", 0.95),
+                version=data.get("version", 1),
+                sources=data.get("sources", []),
+                related=[],
+                author=data.get("author", COMMAND_NAME),
+            )
 
         idx2 = WikiIndex(db_path=wiki_root / "data" / "wiki.db")
         atomic_save(article, idx2)
@@ -347,6 +373,11 @@ def _create_seed_document(wiki_root: "Path", lang: str) -> bool:
         return True
     except Exception:
         return False
+    finally:
+        if previous_root is None:
+            os.environ.pop("AI_WIKI_ROOT", None)
+        else:
+            os.environ["AI_WIKI_ROOT"] = previous_root
 
 
 @cli.command()
@@ -1042,9 +1073,17 @@ def patch_article(ctx, article_id, operations_file, if_version, dry_run):
         if dry_run:
             output_json(protocol_success(response))
             return
-        atomic_update(updated, old_path, idx)
+        try:
+            atomic_update(
+                updated, old_path, idx,
+                vector_upsert=_vector_upsert, vector_remove=_vector_remove,
+            )
+        except Exception as exc:
+            raise ProtocolFailure(
+                "storage_failed", "Document and indexes could not be synchronized",
+                details=str(exc), retryable=True,
+            ) from exc
         rebuild_catalog()
-        _vector_upsert(updated)
         git_auto_commit("patch", article_id, updated.title)
         append_log("patch", article_id=article_id, title=updated.title,
                    details=f"v{updated.version} paths={changed}")
@@ -1146,9 +1185,17 @@ def create(ctx, title, category, tags, confidence, source, related, author,
             if dry_run:
                 output_json(protocol_success(response))
                 return
-            file_path = atomic_save(article, idx)
+            try:
+                file_path = atomic_save(
+                    article, idx,
+                    vector_upsert=_vector_upsert, vector_remove=_vector_remove,
+                )
+            except Exception as exc:
+                raise ProtocolFailure(
+                    "storage_failed", "Document and indexes could not be synchronized",
+                    details=str(exc), retryable=True,
+                ) from exc
             rebuild_catalog()
-            _vector_upsert(article)
             git_auto_commit("create", article.id, article.title)
             append_log("create", article_id=article.id, title=article.title, author=article.author)
             response["file_path"] = get_relative_path(file_path)
@@ -1218,7 +1265,10 @@ def create(ctx, title, category, tags, confidence, source, related, author,
         article.confidence = min(article.confidence, 0.5)
 
     # #15: Atomic save
-    file_path = atomic_save(article, idx)
+    file_path = atomic_save(
+        article, idx,
+        vector_upsert=_vector_upsert, vector_remove=_vector_remove,
+    )
 
     # #8: Auto cross-referencing
     auto_linked = []
@@ -1235,7 +1285,6 @@ def create(ctx, title, category, tags, confidence, source, related, author,
                            for c in strong]
 
     rebuild_catalog()
-    _vector_upsert(article)
     git_auto_commit("create", article_id, title)
     append_log("create", article_id=article_id, title=title, author=author)
 
@@ -1305,9 +1354,11 @@ def update(ctx, article_id, title, tags, confidence, source, related,
     article.last_modified = datetime.now(timezone.utc)
 
     # #15: Atomic update
-    atomic_update(article, old_path, idx)
+    atomic_update(
+        article, old_path, idx,
+        vector_upsert=_vector_upsert, vector_remove=_vector_remove,
+    )
     rebuild_catalog()
-    _vector_upsert(article)
     git_auto_commit("update", article_id, article.title)
     append_log("update", article_id=article_id, title=article.title,
                details=f"v{article.version} changed=[{','.join(changes)}]")
@@ -1810,7 +1861,10 @@ def ingest(ctx, file_path, title, category, tags, source_url, author):
         sources=sources_list, author=author,
     )
 
-    article_path = atomic_save(article, idx)
+    article_path = atomic_save(
+        article, idx,
+        vector_upsert=_vector_upsert, vector_remove=_vector_remove,
+    )
     rebuild_catalog()
     append_log("ingest", article_id=article_id, title=title,
                details=f"file={source.name}")
@@ -2687,29 +2741,30 @@ def cluster(ctx, min_size, limit):
 # ── Helpers ──────────────────────────────────────
 
 def _vector_upsert(article) -> None:
-    """Add/update a document in the vector index. Silently ignored if sqlite-vec is not installed."""
+    """Add or update a document in the required vector index."""
     import io, contextlib
+    vidx = None
     try:
         from ai_wiki.vector import VectorIndex
-        # Capture stderr/stdout during model loading to prevent polluting CLI JSON output
         with contextlib.redirect_stderr(io.StringIO()), \
              contextlib.redirect_stdout(io.StringIO()):
             vidx = VectorIndex()
             vidx.upsert(article)
+    finally:
+        if vidx is not None:
             vidx.close()
-    except Exception:
-        pass  # vector search is optional
 
 
 def _vector_remove(article_id: str) -> None:
-    """Remove a document from the vector index. Silently ignored if sqlite-vec is not installed."""
+    """Remove a document from the required vector index."""
+    vidx = None
     try:
         from ai_wiki.vector import VectorIndex
         vidx = VectorIndex()
         vidx.remove(article_id)
-        vidx.close()
-    except Exception:
-        pass
+    finally:
+        if vidx is not None:
+            vidx.close()
 
 
 def _add_reverse_link(idx: WikiIndex, target_id: str, source_id: str) -> None:
@@ -3062,16 +3117,19 @@ def upgrade_skill():
         path_fn = _AGENT_SKILL_PATHS.get(agent)
         if path_fn is None:
             continue
-        dest_dir = path_fn(wiki_name)
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        copied = []
-        for src in skill_files:
-            shutil.copy2(src, dest_dir / src.name)
-            copied.append(src.name)
-        label = _AGENT_DISPLAY.get(agent, agent)
-        click.echo(msg("upgrade_skill_copied", len(copied), dest_dir, label))
-        for fname in sorted(copied):
-            click.echo(msg("upgrade_skill_file_ok", fname))
+        destinations = [path_fn(wiki_name)]
+        if agent == "gemini":
+            destinations.append(_LEGACY_AGENT_SKILL_PATHS["gemini"][0](wiki_name))
+        for dest_dir in destinations:
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            copied = []
+            for src in skill_files:
+                shutil.copy2(src, dest_dir / src.name)
+                copied.append(src.name)
+            label = _AGENT_DISPLAY.get(agent, agent)
+            click.echo(msg("upgrade_skill_copied", len(copied), dest_dir, label))
+            for fname in sorted(copied):
+                click.echo(msg("upgrade_skill_file_ok", fname))
 
     version_str = pkg_ver or "unknown"
     click.echo(msg("upgrade_skill_done", version_str))

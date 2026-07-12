@@ -1,68 +1,241 @@
-title: About AI Wiki
-category: technology/ai
+schema_version: 2
+id: seed-replaced-during-init
+title: "__WIKI_DISPLAY_NAME__ Self-Reference: Architecture and Operating Principles"
+category: technology/ai/knowledge-systems
 tags:
-  - ai-wiki
-  - knowledge-management
-  - vector-search
-  - cli
+  - __WIKI_COMMAND_NAME__
   - self-reference
-confidence: 0.95
-version: 1
+  - AI-first
+  - knowledge-base
+  - knowledge-graph
+  - YAML
+  - JSON-protocol
+  - hybrid-search
+  - vector-search
+  - citation
+  - RFC-6902
+  - local-first
+metadata:
+  confidence: 0.97
+  document_version: 1
+  created_at: "__NOW__"
+  modified_at: "__NOW__"
+  verified_at: "__NOW__"
+  author: __WIKI_COMMAND_NAME__
+  maturity: review
+  completeness: 0.98
 sources:
-  - https://github.com/j-dev-team/ai-wiki
-  - https://pypi.org/project/ai-wiki/
-author: ai-wiki
+  - id: src-readme
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/README.md
+    title: AI Wiki README
+    retrieved_at: "__NOW__"
+  - id: src-protocol
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/agent_protocol.py
+    title: AI Wiki agent protocol implementation
+    retrieved_at: "__NOW__"
+  - id: src-model
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/models.py
+    title: AI Wiki schema v2 document model
+    retrieved_at: "__NOW__"
+  - id: src-variants
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/docs/VARIANTS.md
+    title: Purpose-specific wiki guide
+    retrieved_at: "__NOW__"
+  - id: src-release
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/docs/RELEASE.ko.md
+    title: AI Wiki release workflow
+    retrieved_at: "__NOW__"
+  - id: src-pypi
+    url: https://pypi.org/project/ai-wiki/__ENGINE_VERSION__/
+    title: AI Wiki on PyPI
+    retrieved_at: "__NOW__"
+relations: []
 content:
   type: technology
-  what: >
-    AI Wiki is a CLI-based structured knowledge encyclopedia that stores, searches,
-    and manages knowledge accumulated by AI agents as YAML data. It solves the problem
-    of repeating the same research every session. Inspired by Karpathy's LLM Wiki idea,
-    it differs from traditional wikis in that the reader, editor, and manager are all LLMs.
-  language: python
-  facts:
-    - Python 3.11+ with Click CLI, SQLite FTS5, Flask Web UI, sqlite-vec vector search
-    - Inspired by Karpathy's LLM Wiki idea (2026-04); uses structured YAML instead of
-      Markdown to maximize AI readability
-    - 37 CLI commands including search, get, create, update, delete, verify, ingest,
-      lint, gaps, stale, history, reindex, quality, maintain, vsearch, vindex,
-      backlinks, sync-backlinks, similar, tags, tag, stats, discover, path, cluster,
-      list, init, destroy, upgrade-skill, export, export-all
-    - "Hybrid search: FTS5 keyword + vector (sentence-transformers/sqlite-vec) + RRF
-      (Reciprocal Rank Fusion) returning hybrid_score"
-    - "Agent skills: Claude Code (~/.claude/skills/), Gemini via Antigravity CLI (~/.gemini/config/skills/),
-      GPT Codex (~/.codex/skills/) — installed selectively at init"
-    - "Interactive init: language (en/ko) -> wiki name -> agent selection -> preset
-      (general/tech/business/research)"
-    - "Quality gates: reject create if fewer than 5 content keys, fewer than 200 chars,
-      or no sources"
-    - "Document maturity: stub -> draft -> review -> mature (completeness via schemas.py)"
-    - Git auto-commit on create/update/delete; web UI wiki name customization
-    - "Deployment: pip install ai-wiki (PyPI), MIT License, GitHub: j-dev-team/ai-wiki"
-  use_cases:
-    - Reuse knowledge across projects — search previously researched info in any session
-    - Fact checking — track mismatches between AI training knowledge and web results via _v
-    - Managing disputed topics — record evolution of consensus with disputes/historiography
-    - Automatic quality management — prevent stubs with quality gates, periodic checks with maintain
-  limitations:
-    - Vector search has a loading delay (~3s) on first call
-    - Local-only design — no auth/authorization, do not expose to external networks
-    - Requires Python 3.11 or higher
-  current_state:
-    pypi: pip install ai-wiki
-    github: https://github.com/j-dev-team/ai-wiki
-    license: MIT
-    python_requires: ">=3.11"
-    cli_commands: 37
-    skill_agents:
-      - Claude Code
-      - Gemini via Antigravity CLI
-      - GPT Codex
-  _meta:
-    maturity: mature
-    completeness: 0.92
-  _changelog:
-    - date: "2026-04-15T00:00:00Z"
-      action: created
-      fields: [what, facts, use_cases, limitations, current_state]
-      note: Seed document auto-generated during ai-wiki init
+  data:
+    what: >-
+      __WIKI_DISPLAY_NAME__ is a local-first structured encyclopedia designed for AI agents
+      to retrieve reusable knowledge across sessions, read it with evidence, and apply validated
+      partial updates or create new documents. Its standard command is __WIKI_COMMAND_NAME__.
+    summary: >-
+      It combines YAML source documents, FTS5, vector and relation retrieval, evidence citations,
+      safe partial writes, and isolated purpose-specific wikis. External agents reason over the
+      evidence while the web UI supports human review.
+    facts:
+      - "The shared engine is PyPI ai-wiki __ENGINE_VERSION__ and the AI protocol version is 1.0."
+      - "Primary AI responses contain protocol_version, status, data, meta, and error."
+      - "YAML documents are durable sources of truth; wiki.db and vectors.db are derived indexes."
+      - "Default retrieval fuses FTS5 keyword and sentence-transformers/sqlite-vec semantic ranks with RRF."
+      - "context combines search and relation candidates within a default 4,000 estimated-token budget."
+      - "Citations use doc:<document-id>#<JSON Pointer> to identify a precise evidence path."
+      - "patch supports a safe RFC 6902 subset and requires optimistic if-version checks."
+      - "Legacy v1 documents normalize to v2 on reads and persist as v2 only after modification."
+      - "Purpose-specific wikis share the engine while isolating documents, databases, vectors, commands, and skills."
+      - "The web UI has no authentication or authorization and is intended only for local use."
+    mission:
+      primary: Give AI agents an encyclopedia they can retrieve, cite, enrich, and reuse safely.
+      secondary: Let humans review documents, sources, verification state, changes, and usage records.
+      non_goal: AI Wiki does not contain the model that performs final reasoning or answer generation.
+    design_principles:
+      - "AI-first: the primary interface is a deterministic CLI JSON protocol, not the web page."
+      - "Evidence-linked: knowledge is traceable through document IDs, JSON Pointers, sources, and verification levels."
+      - "Local-first: knowledge remains in the user's local filesystem."
+      - "Structured source of truth: YAML originals and derived search indexes have separate responsibilities."
+      - "Safe autonomy: AI writes must pass schema, version, protected-field, and quality checks."
+      - "Root isolation: wikis with different purposes cannot share documents, indexes, or use records."
+      - "Incremental evolution: documents move to new schemas when modified rather than through forced bulk rewrites."
+    architecture:
+      durable_storage: schema v2 YAML under articles/<category>/<subcategory>/<slug>.yaml
+      metadata_index: SQLite metadata and FTS5 full-text search in data/wiki.db
+      vector_index: sqlite-vec embeddings and vector metadata in data/vectors.db
+      source_archive: ingested originals under sources
+      operation_history: operation logs and Git auto-commits
+      agent_interface: "__WIKI_COMMAND_NAME__ CLI with protocol 1.0 JSON envelopes"
+      human_interface: local Flask document, list, graph, and review screens
+      shared_engine: the PyPI ai-wiki engine plus thin isolated purpose-specific packages
+    ai_workflow:
+      - Discover commands, schema, and limits with capabilities.
+      - Retrieve an evidence-linked package with context within a token budget.
+      - Answer from documents and citations while preserving citation keys.
+      - Record answered or insufficient and the citations actually used with record-use.
+      - Research authoritative external sources when the context is insufficient.
+      - Enrich existing knowledge through get, dry-run patch, and if-version patch.
+      - Create missing knowledge after a dry run and resolve duplicate_conflict explicitly.
+      - Run context again to verify retrieval and citation paths after writing.
+    protocol_contract:
+      success: status is ok, data contains the result, and error is null.
+      failure: status is error, data is null, and error describes code, message, retryable, and details.
+      read_views: get provides compact, full, and raw views; compact is the default.
+      field_projection: get --fields limits output to required fields.
+      token_estimation: estimates are conservative and provider-neutral using serialized UTF-8 JSON bytes.
+    retrieval_pipeline:
+      candidate_generation: hybrid retrieval selects up to 20 candidates.
+      fusion: Reciprocal Rank Fusion merges FTS5 keyword and vector semantic ranks.
+      relation_expansion: related documents supplement direct search candidates.
+      filtering: pending unverified drafts are excluded from default context retrieval.
+      compaction: title, summary, facts, limitations, confidence, version, sources, and citations take priority.
+      budgeting: low-priority whole documents are omitted instead of truncating values.
+    document_model:
+      identity: id, title, category, and tags provide identity and classification.
+      metadata: confidence, document_version, timestamps, author, maturity, and completeness.
+      sources: source ID, HTTP(S) URL, title, and retrieval time.
+      relations: target ID, relation type, direction, weight, and evidence source IDs.
+      content: a registered content type separated from structured data.
+      verification: JSON Pointer claim paths, verification levels, sources, and timestamps.
+      history: changes remain separate from user knowledge content.
+      extensions: purpose-specific data without weakening the core schema.
+    write_safety:
+      - Apply patches to an in-memory copy before schema and quality validation.
+      - Return version_conflict and the current version on if-version mismatch without auto-retry.
+      - Reject failed tests, invalid paths, protected fields, and unsupported operations.
+      - Synchronize YAML, SQLite, and vectors through atomic replacement and recovery markers.
+      - Validate source references, relation targets, dates, and field types.
+      - Keep deletion outside autonomous AI behavior and require explicit confirmation.
+    verification_policy:
+      levels: [unverified, sourced, verified, corroborated, disputed, human_verified]
+      source_free_rule: source-free reusable knowledge is limited to a pending draft with confidence at or below 0.5.
+      normal_retrieval: pending drafts are excluded from default context retrieval.
+      citation_integrity: record-use rejects citations not issued by the current context.
+      quality_dimensions: structure, content, sources, tags, relations, confidence, and verification coverage.
+    purpose_specific_wikis:
+      reason: separate knowledge with different purposes and security boundaries.
+      presets: [general, law, labor, tax, business, research, personal]
+      custom_manifest: define name, domain, command, description, and triggers for a new category of wiki.
+      isolation: each package has independent YAML, SQLite, vectors, web port, and skills.
+      lifecycle: install, backup, restore, upgrade, migrate, isolation audit, and skill-routing audit.
+    agent_integrations:
+      codex: uses a user SKILL.md to run the JSON protocol.
+      gemini: uses the same protocol through an Antigravity CLI skill.
+      claude: supports the Claude Code skill format.
+      shared_rule: every agent follows capabilities, context, citation, record-use, and patch or create.
+    human_role:
+      - Read and review knowledge created by AI agents.
+      - Inspect pending documents, sources, confidence, and maturity.
+      - Audit relation graphs, change history, and actual use records.
+      - Explicitly authorize high-risk decisions and deletion.
+      - Treat the web UI as a review surface rather than a replacement for the AI protocol.
+    current_release:
+      engine_version: __ENGINE_VERSION__
+      protocol_version: "1.0"
+      distribution: [GitHub, PyPI]
+      install_command: pip install ai-wiki
+      wiki_command: __WIKI_COMMAND_NAME__
+      local_vector_requirement: article and vector counts must match and vector.ready must be true.
+    use_cases:
+      - Reuse researched knowledge and troubleshooting across sessions.
+      - Accumulate research that needs sources and claim-level verification.
+      - Share one local evidence store across multiple AI agents.
+      - Isolate operational domains and sensitive data in purpose-specific wikis.
+    limitations:
+      - Do not expose it to external networks because it has no authentication or authorization.
+      - Local documents and databases are not encrypted by default.
+      - Answer accuracy also depends on agent reasoning and source quality.
+      - Initial vector model setup can require a download and additional disk space.
+      - Stale knowledge requires re-verification.
+    best_practices:
+      - Run context before answering and use only citations it returns.
+      - Separate stable core knowledge from rapidly changing time-series information.
+      - Link sources to claim paths through verification source_ids.
+      - Modify with get, dry-run patch, and if-version patch.
+      - Use doctor to confirm matching document and vector counts and vector.ready.
+    when_to_use:
+      - Knowledge will be reused across sessions or projects.
+      - AI must track evidence and versions while applying partial updates.
+      - A locally controlled AI encyclopedia with semantic search is required.
+    when_not_to_use:
+      - As the direct backend for a public multi-user service requiring auth and encryption.
+      - For disposable conversation content with no reuse value.
+      - For high-risk automated decisions published as facts without source verification.
+verification:
+  - path: /content/data/what
+    level: verified
+    source_ids: [src-readme]
+    verified_at: "__NOW__"
+    note: Checked against the official purpose statement.
+  - path: /content/data/facts
+    level: corroborated
+    source_ids: [src-readme, src-protocol, src-model, src-variants, src-pypi]
+    verified_at: "__NOW__"
+    note: Cross-checked against documentation, implementation, and distribution.
+  - path: /content/data/architecture
+    level: verified
+    source_ids: [src-readme, src-protocol, src-model]
+    verified_at: "__NOW__"
+    note: Checked against repository structure and implementation.
+  - path: /content/data/ai_workflow
+    level: verified
+    source_ids: [src-readme, src-protocol]
+    verified_at: "__NOW__"
+    note: Checked against the protocol implementation.
+  - path: /content/data/document_model
+    level: verified
+    source_ids: [src-readme, src-model]
+    verified_at: "__NOW__"
+    note: Checked against schema v2 and the document model.
+  - path: /content/data/purpose_specific_wikis
+    level: verified
+    source_ids: [src-variants]
+    verified_at: "__NOW__"
+    note: Based on the official variants guide.
+  - path: /content/data/current_release
+    level: corroborated
+    source_ids: [src-release, src-pypi, src-readme]
+    verified_at: "__NOW__"
+    note: Checked against release and distribution documents.
+  - path: /content/data/limitations
+    level: sourced
+    source_ids: [src-readme, src-release]
+    verified_at: "__NOW__"
+    note: Reflects the security notice and release policy.
+history:
+  - at: "__NOW__"
+    action: created
+    fields: [title, category, tags, metadata, sources, content, verification]
+    note: Self-reference seed document generated automatically during initialization.
+extensions:
+  self_reference:
+    subject: __WIKI_COMMAND_NAME__
+    engine: ai-wiki
+    engine_version: __ENGINE_VERSION__
+    protocol: "1.0"
+    generated_during_init: true

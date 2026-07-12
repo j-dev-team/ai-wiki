@@ -1,6 +1,8 @@
 """타입별 문서 스키마 정의 및 completeness 계산."""
 from __future__ import annotations
 
+import copy
+
 
 # 타입별 필수(required) / 선택(optional) 필드 정의
 # completeness = (채워진 required * 1.0 + 채워진 optional * 0.5)
@@ -67,6 +69,8 @@ DEFAULT_SCHEMA: dict[str, list[str]] = {
     "required": ["type", "what"],
     "optional": [],
 }
+
+BUILTIN_TYPE_SCHEMAS = copy.deepcopy(TYPE_SCHEMAS)
 
 
 _LIST_FIELDS = {
@@ -221,7 +225,7 @@ BASE_SCHEMA: dict[str, list[str]] = {
 }
 
 
-def register_custom_types(config_path) -> dict:
+def register_custom_types(config_path, *, reset: bool = False) -> dict:
     """위키 설정 파일(.ai-wiki.yaml)에서 custom_types를 로드해 TYPE_SCHEMAS에 등록.
 
     Args:
@@ -232,6 +236,10 @@ def register_custom_types(config_path) -> dict:
     """
     from pathlib import Path as _Path
     import yaml as _yaml
+
+    if reset:
+        TYPE_SCHEMAS.clear()
+        TYPE_SCHEMAS.update(copy.deepcopy(BUILTIN_TYPE_SCHEMAS))
 
     config_path = _Path(config_path)
     if not config_path.exists():

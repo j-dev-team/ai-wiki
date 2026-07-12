@@ -211,6 +211,12 @@ def test_init_creates_wiki_structure(tmp_path):
     assert (new_wiki_dir / "logs").exists()
     assert (new_wiki_dir / "data" / "wiki.db").exists()
     assert (new_wiki_dir / ".ai-wiki.yaml").exists()
+    seed_files = list((new_wiki_dir / "articles").rglob("*.yaml"))
+    assert len(seed_files) == 1
+    seed_document = yaml.safe_load(seed_files[0].read_text(encoding="utf-8"))
+    assert seed_document["schema_version"] == 2
+    assert "Self-Reference" in seed_document["title"]
+    assert not (tmp_path / "articles").exists()
 
 
 def test_init_creates_skill_dirs(tmp_path):
@@ -225,10 +231,12 @@ def test_init_creates_skill_dirs(tmp_path):
     wiki_name = tmp_path.name
     claude_skill_dir = Path.home() / ".claude" / "skills" / wiki_name
     gemini_skill_dir = Path.home() / ".gemini" / "config" / "skills" / wiki_name
+    gemini_compat_skill_dir = Path.home() / ".agents" / "skills" / wiki_name
     codex_skill_dir = Path.home() / ".codex" / "skills" / wiki_name
 
     assert not claude_skill_dir.exists(), f"{claude_skill_dir} should not exist before test"
     assert not gemini_skill_dir.exists(), f"{gemini_skill_dir} should not exist before test"
+    assert not gemini_compat_skill_dir.exists(), f"{gemini_compat_skill_dir} should not exist before test"
     assert not codex_skill_dir.exists(), f"{codex_skill_dir} should not exist before test"
 
     os.environ["AI_WIKI_ROOT"] = str(tmp_path)
@@ -246,9 +254,11 @@ def test_init_creates_skill_dirs(tmp_path):
         if has_templates:
             assert claude_skill_dir.exists(), f"claude skill dir should be created: {claude_skill_dir}"
             assert gemini_skill_dir.exists(), f"gemini skill dir should be created: {gemini_skill_dir}"
+            assert gemini_compat_skill_dir.exists(), f"gemini compatibility skill dir should be created: {gemini_compat_skill_dir}"
+            assert (gemini_skill_dir / "SKILL.md").read_bytes() == (gemini_compat_skill_dir / "SKILL.md").read_bytes()
             assert codex_skill_dir.exists(), f"codex skill dir should be created: {codex_skill_dir}"
     finally:
-        for d in (claude_skill_dir, gemini_skill_dir, codex_skill_dir):
+        for d in (claude_skill_dir, gemini_skill_dir, gemini_compat_skill_dir, codex_skill_dir):
             if d.exists():
                 _shutil.rmtree(d)
 def test_init_already_initialized(tmp_path):

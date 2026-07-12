@@ -157,6 +157,33 @@ class TestSchemaInheritance:
         result = register_custom_types(tmp_path / "nonexistent.yaml")
         assert result == {}
 
+    def test_capabilities_loads_only_current_root_custom_types(self, tmp_path):
+        first = tmp_path / "first"
+        second = tmp_path / "second"
+        for root, type_name in ((first, "first_custom"), (second, "second_custom")):
+            (root / "articles").mkdir(parents=True)
+            (root / "data").mkdir()
+            (root / ".ai-wiki.yaml").write_text(yaml.safe_dump({
+                "custom_types": {
+                    type_name: {"required": ["type", "what"], "optional": ["notes"]},
+                },
+            }), encoding="utf-8")
+
+        first_result = CliRunner().invoke(
+            cli, ["capabilities"], env={"AI_WIKI_ROOT": str(first)},
+        )
+        second_result = CliRunner().invoke(
+            cli, ["capabilities"], env={"AI_WIKI_ROOT": str(second)},
+        )
+        first_types = json.loads(first_result.output)["data"]["content_types"]
+        second_payload = json.loads(second_result.output)["data"]
+
+        assert "first_custom" in first_types
+        assert "second_custom" not in first_types
+        assert "second_custom" in second_payload["content_types"]
+        assert "first_custom" not in second_payload["content_types"]
+        assert "second_custom" in second_payload["schema"]["x-ai-wiki-content-types"]
+
     def test_completeness_uses_inheritance(self):
         content = {"type": "technology", "what": "test", "facts": ["f1", "f2"]}
         comp, missing, hints = compute_completeness(content)

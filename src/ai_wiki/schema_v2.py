@@ -35,7 +35,7 @@ class SourceRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(min_length=1)
-    url: str
+    url: str = Field(pattern=r"^https?://[^\s/]+(?:/[^\s]*)?$")
     title: str = ""
     retrieved_at: datetime | None = None
 
@@ -215,4 +215,12 @@ def validate_v2_document(data: dict[str, Any]) -> WikiDocumentV2:
 
 def document_json_schema() -> dict[str, Any]:
     """Return the machine-readable JSON Schema for integrations."""
-    return WikiDocumentV2.model_json_schema()
+    import copy
+
+    schema = WikiDocumentV2.model_json_schema()
+    content_block = schema.get("$defs", {}).get("ContentBlock", {})
+    type_property = content_block.get("properties", {}).get("type")
+    if isinstance(type_property, dict):
+        type_property["enum"] = sorted(TYPE_SCHEMAS)
+    schema["x-ai-wiki-content-types"] = copy.deepcopy(TYPE_SCHEMAS)
+    return schema

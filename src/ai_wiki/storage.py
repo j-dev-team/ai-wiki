@@ -9,6 +9,7 @@ import sqlite3
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Callable
 
 import yaml
 
@@ -289,7 +290,7 @@ def delete_source_files(article_id: str) -> bool:
 
 # ── #15: 원자적 저장 ─────────────────────────────
 
-def atomic_save(article: Article, index) -> Path:
+def _atomic_save_yaml_index(article: Article, index) -> Path:
     """파일 저장 + DB upsert를 원자적으로 수행. 실패 시 롤백."""
     file_path = _article_file_path(article)
     previous = file_path.read_bytes() if file_path.exists() else None
@@ -336,7 +337,7 @@ def git_auto_commit(action: str, article_id: str = "", title: str = "") -> bool:
         return False
 
 
-def atomic_update(article: Article, old_path: Path | None, index) -> Path:
+def _atomic_update_yaml_index(article: Article, old_path: Path | None, index) -> Path:
     """Atomically replace YAML, then reconcile the derived SQLite index."""
     file_path = _article_file_path(article)
     target_backup = file_path.read_bytes() if file_path.exists() else None
@@ -361,6 +362,169 @@ def atomic_update(article: Article, old_path: Path | None, index) -> Path:
         old_path.unlink(missing_ok=True)
     pending.unlink(missing_ok=True)
     return file_path
+
+
+def atomic_save(
+    article: Article,
+    index,
+    *,
+    vector_upsert: Callable[[Article], None] | None = None,
+    vector_remove: Callable[[str], None] | None = None,
+) -> Path:
+    """Save YAML and both indexes, restoring the prior state on failure."""
+    file_path = _article_file_path(article)
+    previous = file_path.read_bytes() if file_path.exists() else None
+    previous_article = _article_from_bytes(previous) if previous else None
+    vector_pending = _mark_vector_pending(article, file_path) if vector_upsert else None
+    try:
+        committed_path = _atomic_save_yaml_index(article, index)
+    except Exception:
+        if vector_pending:
+            vector_pending.unlink(missing_ok=True)
+        raise
+    if not vector_upsert:
+        return committed_path
+    try:
+        vector_upsert(article)
+        vector_pending.unlink(missing_ok=True)
+        return committed_path
+    except Exception as exc:
+        rollback_error = _rollback_after_vector_failure(
+            article.id, index, committed_path, previous, previous_article,
+            vector_upsert, vector_remove,
+        )
+        if rollback_error:
+            raise RuntimeError(f"storage rollback failed: {rollback_error}") from exc
+        vector_pending.unlink(missing_ok=True)
+        raise
+
+
+def atomic_update(
+    article: Article,
+    old_path: Path | None,
+    index,
+    *,
+    vector_upsert: Callable[[Article], None] | None = None,
+    vector_remove: Callable[[str], None] | None = None,
+) -> Path:
+    """Update YAML and both indexes, restoring the prior state on failure."""
+    new_path = _article_file_path(article)
+    target_backup = new_path.read_bytes() if new_path.exists() else None
+    old_backup = old_path.read_bytes() if old_path and old_path.exists() else None
+    previous_bytes = old_backup if old_backup is not None else target_backup
+    previous_article = _article_from_bytes(previous_bytes) if previous_bytes else None
+    previous_path = old_path if old_backup is not None else new_path
+    vector_pending = _mark_vector_pending(article, new_path) if vector_upsert else None
+    try:
+        committed_path = _atomic_update_yaml_index(article, old_path, index)
+    except Exception:
+        if vector_pending:
+            vector_pending.unlink(missing_ok=True)
+        raise
+    if not vector_upsert:
+        return committed_path
+    try:
+        vector_upsert(article)
+        vector_pending.unlink(missing_ok=True)
+        return committed_path
+    except Exception as exc:
+        rollback_error = _rollback_update_after_vector_failure(
+            article.id, index, committed_path, previous_path,
+            target_backup, old_backup, previous_article,
+            vector_upsert, vector_remove,
+        )
+        if rollback_error:
+            raise RuntimeError(f"storage rollback failed: {rollback_error}") from exc
+        vector_pending.unlink(missing_ok=True)
+        raise
+
+
+def _article_from_bytes(data: bytes) -> Article:
+    raw = yaml.safe_load(data.decode("utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("stored document root must be a mapping")
+    return Article.from_yaml(raw)
+
+
+def _restore_index_and_vector(
+    article_id: str,
+    index,
+    previous_article: Article | None,
+    previous_path: Path,
+    vector_upsert: Callable[[Article], None],
+    vector_remove: Callable[[str], None] | None,
+) -> Exception | None:
+    try:
+        if previous_article is None:
+            index.remove(article_id)
+            if vector_remove:
+                vector_remove(article_id)
+        else:
+            index.upsert(previous_article, get_relative_path(previous_path))
+            vector_upsert(previous_article)
+        return None
+    except Exception as exc:
+        return exc
+
+
+def _rollback_after_vector_failure(
+    article_id: str,
+    index,
+    file_path: Path,
+    previous: bytes | None,
+    previous_article: Article | None,
+    vector_upsert: Callable[[Article], None],
+    vector_remove: Callable[[str], None] | None,
+) -> Exception | None:
+    try:
+        if previous is None:
+            file_path.unlink(missing_ok=True)
+        else:
+            _atomic_write_bytes(file_path, previous)
+    except Exception as exc:
+        return exc
+    return _restore_index_and_vector(
+        article_id, index, previous_article, file_path, vector_upsert, vector_remove,
+    )
+
+
+def _rollback_update_after_vector_failure(
+    article_id: str,
+    index,
+    committed_path: Path,
+    previous_path: Path,
+    target_backup: bytes | None,
+    old_backup: bytes | None,
+    previous_article: Article | None,
+    vector_upsert: Callable[[Article], None],
+    vector_remove: Callable[[str], None] | None,
+) -> Exception | None:
+    try:
+        if target_backup is None:
+            committed_path.unlink(missing_ok=True)
+        else:
+            _atomic_write_bytes(committed_path, target_backup)
+        if old_backup is not None and previous_path != committed_path:
+            _atomic_write_bytes(previous_path, old_backup)
+    except Exception as exc:
+        return exc
+    return _restore_index_and_vector(
+        article_id, index, previous_article, previous_path, vector_upsert, vector_remove,
+    )
+
+
+def _mark_vector_pending(article: Article, file_path: Path) -> Path:
+    """Persist a recovery marker until the vector index matches the YAML document."""
+    pending_dir = get_data_dir() / "pending-vector"
+    pending_dir.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256(article.id.encode("utf-8")).hexdigest()
+    marker = pending_dir / f"{digest}.json"
+    payload = json.dumps({
+        "article_id": article.id,
+        "file_path": get_relative_path(file_path),
+    }, ensure_ascii=False).encode("utf-8")
+    _atomic_write_bytes(marker, payload)
+    return marker
 
 
 def _article_file_path(article: Article) -> Path:

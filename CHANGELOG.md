@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0 - 2026-07-12
+
+- Make compact context citations resolve only to values actually included in the AI payload.
+- Add query-aware compact fields so nonstandard evidence such as architecture is retrievable and citable.
+- Promote explicitly related documents into the final context candidates even when hybrid search ranks them below the limit.
+- Require vector synchronization for document writes, roll back YAML and SQLite on failure, and recover interrupted vector writes from durable markers.
+- Load custom document types from the active wiki root and expose type and HTTP source constraints through capabilities JSON Schema.
+- Synchronize Gemini skills across Antigravity and Gemini CLI discovery paths and verify matching skill contents.
+- Keep CLI JSON output parseable while package and installed skill versions temporarily differ during upgrades.
+- Add isolated 1,000-document retrieval gates, vector failure injection tests, and Codex/Gemini 24-task live acceptance evidence.
+- Add a detailed schema-v2 self-reference seed document and improve the human review article layout.
+
 ## 0.4.0 - 2026-07-12
 
 - Add a stable AI JSON protocol with compact, full, and raw document views.

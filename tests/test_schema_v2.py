@@ -12,7 +12,13 @@ from click.testing import CliRunner
 from ai_wiki.migration import migrate_article_files, migrate_v1_to_v2
 from ai_wiki.models import Article
 from ai_wiki.schema_v2 import document_json_schema, validate_v2_document
-from ai_wiki.storage import _mark_index_pending, atomic_update, load_article, save_article
+from ai_wiki.storage import (
+    _mark_index_pending,
+    _mark_vector_pending,
+    atomic_update,
+    load_article,
+    save_article,
+)
 from ai_wiki.index import WikiIndex
 from ai_wiki.yaml_loader import load_yaml_text
 from ai_wiki.cli import cli
@@ -86,6 +92,9 @@ def test_json_schema_is_versioned_and_closed():
     schema = document_json_schema()
     assert schema["properties"]["schema_version"]["const"] == 2
     assert schema["additionalProperties"] is False
+    assert schema["$defs"]["SourceRecord"]["properties"]["url"]["pattern"].startswith("^https?")
+    assert "technology" in schema["$defs"]["ContentBlock"]["properties"]["type"]["enum"]
+    assert schema["x-ai-wiki-content-types"]["technology"]["required"]
 
 
 def test_save_writes_canonical_v2_and_roundtrips(wiki_root, sample_article):
@@ -135,6 +144,21 @@ def test_pending_index_marker_is_reconciled_on_startup(wiki_root, sample_article
     index = WikiIndex(wiki_root / "data" / "wiki.db")
     try:
         assert index.count() == 1
+        assert not marker.exists()
+    finally:
+        index.close()
+
+
+def test_pending_vector_marker_is_reconciled_on_startup(wiki_root, sample_article):
+    path = save_article(sample_article)
+    marker = _mark_vector_pending(sample_article, path)
+    vector = MagicMock()
+
+    with patch("ai_wiki.vector.VectorIndex", return_value=vector):
+        index = WikiIndex(wiki_root / "data" / "wiki.db")
+    try:
+        vector.upsert.assert_called_once()
+        assert vector.upsert.call_args.args[0].id == sample_article.id
         assert not marker.exists()
     finally:
         index.close()

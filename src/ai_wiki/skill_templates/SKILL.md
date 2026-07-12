@@ -1,6 +1,6 @@
 ---
 name: ai-wiki
-version: 0.4.0
+version: 0.5.0
 description: AI-first reusable knowledge encyclopedia. Retrieve evidence-linked context before answering, cite document paths, and autonomously write back reusable knowledge through validated create or patch operations.
 user-invocable: true
 argument-hint: "[capabilities|context|get|record-use|patch|create] [query or options]"

@@ -1,0 +1,411 @@
+{
+  "status": "ok",
+  "root": "C:\\Users\\Public\\Documents\\ESTsoft\\CreatorTemp\\ai-first-1000-9ci8rl3t",
+  "document_count": 1000,
+  "yaml_count": 1000,
+  "vector_count": 1000,
+  "exact_recall_at_5": 1.0,
+  "semantic_recall_at_5": 1.0,
+  "relation_recall_at_5": 1.0,
+  "conflict_pair_retrieved": true,
+  "pending_policy_pass": true,
+  "token_budget_violations": 0,
+  "citation_value_coverage": 1.0,
+  "storage_counts_match": true,
+  "exact_cases": [
+    {
+      "query": "exactmarker0",
+      "expected": "eval-exact-0-abc123",
+      "ids": [
+        "eval-exact-0-abc123",
+        "eval-distractor-0886-abc123",
+        "eval-distractor-0888-abc123",
+        "eval-distractor-0899-abc123",
+        "eval-distractor-0666-abc123"
+      ],
+      "pass": true
+    },
+    {
+      "query": "exactmarker1",
+      "expected": "eval-exact-1-abc123",
+      "ids": [
+        "eval-exact-1-abc123",
+        "eval-exact-0-abc123",
+        "eval-exact-2-abc123",
+        "eval-exact-7-abc123",
+        "eval-exact-4-abc123"
+      ],
+      "pass": true
+    },
+    {
+      "query": "exactmarker2",
+      "expected": "eval-exact-2-abc123",
+      "ids": [
+        "eval-exact-2-abc123",
+        "eval-exact-0-abc123",
+        "eval-exact-1-abc123",
+        "eval-exact-7-abc123",
+        "eval-exact-3-abc123"
+      ],
+      "pass": true
+    },
+    {
+      "query": "exactmarker3",
+      "expected": "eval-exact-3-abc123",
+      "ids": [
+        "eval-exact-3-abc123",
+        "eval-exact-4-abc123",
+        "eval-exact-0-abc123",
+        "eval-exact-2-abc123",
+        "eval-exact-7-abc123"
+      ],
+      "pass": true
+    },
+    {
+      "query": "exactmarker4",
+      "expected": "eval-exact-4-abc123",
+      "ids": [
+        "eval-exact-4-abc123",
+        "eval-exact-0-abc123",
+        "eval-exact-3-abc123",
+        "eval-exact-5-abc123",
+        "eval-exact-6-abc123"
+      ],
+      "pass": true
+    },
+    {
+      "query": "exactmarker5",
+      "expected": "eval-exact-5-abc123",
+      "ids": [
+        "eval-exact-5-abc123",
+        "eval-exact-6-abc123",
+        "eval-exact-4-abc123",
+        "eval-exact-0-abc123",
+        "eval-exact-7-abc123"
+      ],
+      "pass": true
+    },
+    {
+      "query": "exactmarker6",
+      "expected": "eval-exact-6-abc123",
+      "ids": [
+        "eval-exact-6-abc123",
+        "eval-exact-5-abc123",
+        "eval-exact-7-abc123",
+        "eval-exact-0-abc123",
+        "eval-exact-4-abc123"
+      ],
+      "pass": true
+    },
+    {
+      "query": "exactmarker7",
+      "expected": "eval-exact-7-abc123",
+      "ids": [
+        "eval-exact-7-abc123",
+        "eval-exact-0-abc123",
+        "eval-distractor-0886-abc123",
+        "eval-distractor-0888-abc123",
+        "eval-exact-6-abc123"
+      ],
+      "pass": true
+    }
+  ],
+  "semantic_cases": [
+    {
+      "query": "device making power from solar radiation",
+      "expected": "eval-solar-abc123",
+      "ids": [
+        "eval-solar-abc123",
+        "eval-related-detail-abc123",
+        "eval-insulin-abc123",
+        "eval-atomic-abc123",
+        "eval-conflict-a-abc123"
+      ],
+      "pass": true
+    },
+    {
+      "query": "all or nothing data operation",
+      "expected": "eval-atomic-abc123",
+      "ids": [
+        "eval-atomic-abc123",
+        "eval-cache-abc123",
+        "eval-related-hub-abc123",
+        "eval-contract-abc123",
+        "eval-conflict-a-abc123"
+      ],
+      "pass": true
+    },
+    {
+      "query": "paper documenting pay and work terms for a new employee",
+      "expected": "eval-contract-abc123",
+      "ids": [
+        "eval-embedding-abc123",
+        "eval-contract-abc123",
+        "eval-conflict-a-abc123",
+        "eval-related-detail-abc123",
+        "eval-pending-abc123"
+      ],
+      "pass": true
+    },
+    {
+      "query": "numerical representation of language meaning",
+      "expected": "eval-embedding-abc123",
+      "ids": [
+        "eval-embedding-abc123",
+        "eval-atomic-abc123",
+        "eval-contract-abc123",
+        "eval-related-hub-abc123",
+        "eval-conflict-a-abc123"
+      ],
+      "pass": true
+    },
+    {
+      "query": "hormone controlling sugar levels",
+      "expected": "eval-insulin-abc123",
+      "ids": [
+        "eval-insulin-abc123",
+        "eval-exact-0-abc123",
+        "eval-distractor-0264-abc123",
+        "eval-exact-2-abc123",
+        "eval-solar-abc123"
+      ],
+      "pass": true
+    },
+    {
+      "query": "refresh stored fast copy when original data changes",
+      "expected": "eval-cache-abc123",
+      "ids": [
+        "eval-cache-abc123",
+        "eval-conflict-b-abc123",
+        "eval-related-hub-abc123",
+        "eval-atomic-abc123",
+        "eval-conflict-a-abc123"
+      ],
+      "pass": true
+    }
+  ],
+  "relation_documents": [
+    {
+      "id": "eval-related-hub-abc123",
+      "title": "relationhubunique",
+      "category": "evaluation/ai-first",
+      "type": "technology",
+      "tags": [
+        "evaluation"
+      ],
+      "confidence": 0.95,
+      "version": 1,
+      "modified_at": "2026-07-12T04:30:11Z",
+      "verification_status": "active",
+      "content": {
+        "what": "relationhubunique is the direct graph entry.",
+        "facts": [
+          "relationhubunique is the direct graph entry."
+        ],
+        "use_cases": [
+          "AI retrieval evaluation"
+        ],
+        "limitations": [
+          "Synthetic isolated data"
+        ],
+        "best_practices": [
+          "Use issued citations only"
+        ]
+      },
+      "sources": [
+        {
+          "id": "src-1",
+          "url": "https://example.com/eval-related-hub-abc123",
+          "title": ""
+        }
+      ],
+      "citations": [
+        "doc:eval-related-hub-abc123#/content/data/facts"
+      ],
+      "score": 0.0328,
+      "selection_reason": "hybrid"
+    },
+    {
+      "id": "eval-related-detail-abc123",
+      "title": "QZX Evidence 742",
+      "category": "evaluation/ai-first",
+      "type": "technology",
+      "tags": [
+        "evaluation"
+      ],
+      "confidence": 0.95,
+      "version": 1,
+      "modified_at": "2026-07-12T04:30:11Z",
+      "verification_status": "active",
+      "content": {
+        "what": "A cadastral folio uses the isolated code QZX-742.",
+        "facts": [
+          "The isolated archival code is QZX-742."
+        ],
+        "use_cases": [
+          "AI retrieval evaluation"
+        ],
+        "limitations": [
+          "Synthetic isolated data"
+        ],
+        "best_practices": [
+          "Use issued citations only"
+        ]
+      },
+      "sources": [
+        {
+          "id": "src-1",
+          "url": "https://example.com/eval-related-detail-abc123",
+          "title": ""
+        }
+      ],
+      "citations": [
+        "doc:eval-related-detail-abc123#/content/data/facts"
+      ],
+      "score": 0.0246,
+      "selection_reason": "related:eval-related-hub-abc123"
+    },
+    {
+      "id": "eval-conflict-a-abc123",
+      "title": "Chronoflux Claim A",
+      "category": "evaluation/ai-first",
+      "type": "technology",
+      "tags": [
+        "conflict"
+      ],
+      "confidence": 0.95,
+      "version": 1,
+      "modified_at": "2026-07-12T04:30:11Z",
+      "verification_status": "active",
+      "content": {
+        "what": "chronoflux threshold equals 10 units.",
+        "facts": [
+          "chronoflux threshold equals 10 units."
+        ],
+        "use_cases": [
+          "AI retrieval evaluation"
+        ],
+        "limitations": [
+          "Synthetic isolated data"
+        ],
+        "best_practices": [
+          "Use issued citations only"
+        ]
+      },
+      "sources": [
+        {
+          "id": "src-1",
+          "url": "https://example.com/eval-conflict-a-abc123",
+          "title": ""
+        }
+      ],
+      "citations": [
+        "doc:eval-conflict-a-abc123#/content/data/facts"
+      ],
+      "score": 0.0161,
+      "selection_reason": "hybrid"
+    },
+    {
+      "id": "eval-conflict-b-abc123",
+      "title": "Chronoflux Claim B",
+      "category": "evaluation/ai-first",
+      "type": "technology",
+      "tags": [
+        "conflict"
+      ],
+      "confidence": 0.95,
+      "version": 1,
+      "modified_at": "2026-07-12T04:30:11Z",
+      "verification_status": "active",
+      "content": {
+        "what": "chronoflux threshold equals 20 units.",
+        "facts": [
+          "chronoflux threshold equals 20 units."
+        ],
+        "use_cases": [
+          "AI retrieval evaluation"
+        ],
+        "limitations": [
+          "Synthetic isolated data"
+        ],
+        "best_practices": [
+          "Use issued citations only"
+        ]
+      },
+      "sources": [
+        {
+          "id": "src-1",
+          "url": "https://example.com/eval-conflict-b-abc123",
+          "title": ""
+        }
+      ],
+      "citations": [
+        "doc:eval-conflict-b-abc123#/content/data/facts"
+      ],
+      "score": 0.0159,
+      "selection_reason": "hybrid"
+    },
+    {
+      "id": "eval-embedding-abc123",
+      "title": "Eval Embedding Abc123",
+      "category": "evaluation/ai-first",
+      "type": "technology",
+      "tags": [
+        "evaluation"
+      ],
+      "confidence": 0.95,
+      "version": 1,
+      "modified_at": "2026-07-12T04:30:11Z",
+      "verification_status": "active",
+      "content": {
+        "what": "A text embedding maps semantic meaning into a numeric vector.",
+        "facts": [
+          "A text embedding maps semantic meaning into a numeric vector."
+        ],
+        "use_cases": [
+          "AI retrieval evaluation"
+        ],
+        "limitations": [
+          "Synthetic isolated data"
+        ],
+        "best_practices": [
+          "Use issued citations only"
+        ]
+      },
+      "sources": [
+        {
+          "id": "src-1",
+          "url": "https://example.com/eval-embedding-abc123",
+          "title": ""
+        }
+      ],
+      "citations": [
+        "doc:eval-embedding-abc123#/content/data/facts"
+      ],
+      "score": 0.0156,
+      "selection_reason": "hybrid"
+    }
+  ],
+  "token_boundaries": [
+    {
+      "budget": 256,
+      "actual": 147,
+      "pass": true
+    },
+    {
+      "budget": 512,
+      "actual": 147,
+      "pass": true
+    },
+    {
+      "budget": 1200,
+      "actual": 1043,
+      "pass": true
+    },
+    {
+      "budget": 4000,
+      "actual": 3657,
+      "pass": true
+    }
+  ]
+}

@@ -5,7 +5,8 @@ from pathlib import Path
 import yaml
 from click.testing import CliRunner
 
-from ai_wiki.cli import cli
+from ai_wiki import __version__
+from ai_wiki.cli import _create_seed_document, cli
 
 
 def _run(runner, args, wiki_root):
@@ -60,6 +61,55 @@ def test_create_and_get(tmp_path):
 
     legacy = _run(runner, ["get", article_id, "--legacy"], wiki_root)
     assert json.loads(legacy.output)["article"]["title"] == "Test CLI Article"
+
+
+def test_seed_document_is_detailed_schema_v2(tmp_path):
+    for lang, title_marker in (("ko", "자기참조"), ("en", "Self-Reference")):
+        wiki_root = tmp_path / lang
+        (wiki_root / "articles").mkdir(parents=True)
+        (wiki_root / "data").mkdir()
+        (wiki_root / "logs").mkdir()
+
+        assert _create_seed_document(wiki_root, lang) is True
+
+        seed_files = list((wiki_root / "articles").rglob("*.yaml"))
+        assert len(seed_files) == 1
+        seed_text = seed_files[0].read_text(encoding="utf-8")
+        document = yaml.safe_load(seed_text)
+
+        assert document["schema_version"] == 2
+        assert title_marker in document["title"]
+        assert "__WIKI_" not in seed_text
+        assert "__ENGINE_VERSION__" not in seed_text
+        assert "__NOW__" not in seed_text
+        assert document["content"]["type"] == "technology"
+        assert len(document["content"]["data"]) >= 18
+        assert len(document["sources"]) >= 5
+        assert len(document["verification"]) >= 6
+        assert document["metadata"]["document_version"] == 1
+        assert document["extensions"]["self_reference"]["engine_version"] == __version__
+
+        assert _create_seed_document(wiki_root, lang) is False
+
+
+def test_seed_document_uses_variant_identity_without_rewriting_upstream_urls(tmp_path, monkeypatch):
+    import ai_wiki.cli as cli_module
+
+    (tmp_path / "articles").mkdir()
+    (tmp_path / "data").mkdir()
+    (tmp_path / "logs").mkdir()
+    monkeypatch.setattr(cli_module, "DISPLAY_NAME", "Patent Wiki")
+    monkeypatch.setattr(cli_module, "COMMAND_NAME", "patent-wiki")
+
+    assert cli_module._create_seed_document(tmp_path, "en") is True
+    seed_file = next((tmp_path / "articles").rglob("*.yaml"))
+    document = yaml.safe_load(seed_file.read_text(encoding="utf-8"))
+
+    assert document["title"].startswith("Patent Wiki Self-Reference")
+    assert document["metadata"]["author"] == "patent-wiki"
+    assert "patent-wiki" in document["tags"]
+    assert document["extensions"]["self_reference"]["subject"] == "patent-wiki"
+    assert all("github.com/j-dev-team/ai-wiki" in source["url"] or "pypi.org/project/ai-wiki" in source["url"] for source in document["sources"])
 
 
 def test_search(tmp_path):
