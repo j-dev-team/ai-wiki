@@ -5,6 +5,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from ai_wiki.chunking import article_chunks
 from ai_wiki.models import Article
 from ai_wiki.storage import get_data_dir
 
@@ -18,6 +19,9 @@ class WikiIndex:
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA journal_mode = WAL")
+        self.last_retrieval_status = {
+            "mode": "not_run", "vector_status": "not_checked", "vector_error": None,
+        }
         self.initialize()
         self._reconcile_pending_updates()
         self._reconcile_pending_vectors()
@@ -47,6 +51,27 @@ class WikiIndex:
                 tags,
                 content_text,
                 tokenize='unicode61 remove_diacritics 2'
+            );
+
+            CREATE TABLE IF NOT EXISTS article_chunks (
+                chunk_id TEXT PRIMARY KEY,
+                article_id TEXT NOT NULL,
+                path TEXT NOT NULL,
+                text TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                ordinal INTEGER NOT NULL,
+                part INTEGER NOT NULL DEFAULT 0
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_article_chunks_article
+                ON article_chunks(article_id, ordinal);
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS article_chunks_fts USING fts5(
+                chunk_id UNINDEXED,
+                article_id UNINDEXED,
+                path UNINDEXED,
+                indexed_text,
+                tokenize='trigram'
             );
 
             CREATE TABLE IF NOT EXISTS article_relations (
@@ -242,6 +267,24 @@ class WikiIndex:
                 (article.id, url),
             )
 
+        cur.execute("DELETE FROM article_chunks_fts WHERE article_id = ?", (article.id,))
+        cur.execute("DELETE FROM article_chunks WHERE article_id = ?", (article.id,))
+        for chunk in article_chunks(article):
+            cur.execute(
+                """INSERT INTO article_chunks
+                   (chunk_id, article_id, path, text, content_hash, ordinal, part)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    chunk.chunk_id, article.id, chunk.path, chunk.text,
+                    chunk.content_hash, chunk.ordinal, chunk.part,
+                ),
+            )
+            cur.execute(
+                """INSERT INTO article_chunks_fts
+                   (chunk_id, article_id, path, indexed_text) VALUES (?, ?, ?, ?)""",
+                (chunk.chunk_id, article.id, chunk.path, chunk.indexed_text),
+            )
+
         self.conn.commit()
 
     def remove(self, article_id: str) -> None:
@@ -251,9 +294,19 @@ class WikiIndex:
         cur.execute("DELETE FROM article_relations WHERE from_id = ? OR to_id = ?",
                      (article_id, article_id))
         cur.execute("DELETE FROM article_sources WHERE article_id = ?", (article_id,))
+        cur.execute("DELETE FROM article_chunks_fts WHERE article_id = ?", (article_id,))
+        cur.execute("DELETE FROM article_chunks WHERE article_id = ?", (article_id,))
         self.conn.commit()
 
-    def search(
+    def chunk_count(self) -> int:
+        row = self.conn.execute("SELECT COUNT(*) FROM article_chunks").fetchone()
+        return int(row[0]) if row else 0
+
+    def chunk_document_count(self) -> int:
+        row = self.conn.execute("SELECT COUNT(DISTINCT article_id) FROM article_chunks").fetchone()
+        return int(row[0]) if row else 0
+
+    def _search_legacy(
         self,
         query: str,
         category: str | None = None,
@@ -386,6 +439,135 @@ class WikiIndex:
             })
         return output
 
+    def search(
+        self,
+        query: str,
+        category: str | None = None,
+        tags: list[str] | None = None,
+        limit: int = 20,
+        min_confidence: float = 0.0,
+        require_vector: bool = False,
+    ) -> list[dict]:
+        """Fuse document FTS, chunk FTS, and chunk vectors with reciprocal ranks."""
+        fts_results = self._search_fts(
+            query, category=category, tags=tags,
+            limit=5, min_confidence=min_confidence,
+        )
+        chunk_fts_results = self._search_chunk_fts(query, limit=5)
+        vector_results = self._search_vector(query, limit=max(limit * 3, 20))
+        if require_vector and self.last_retrieval_status["vector_status"] != "ready":
+            from ai_wiki.vector import VectorSearchUnavailable
+            raise VectorSearchUnavailable(
+                self.last_retrieval_status.get("vector_error") or "vector_unavailable",
+                "Required vector retrieval is unavailable",
+            )
+
+        rrf_k = 60
+        merged: dict[str, dict] = {}
+        semantic_pool = {item["id"] for item in vector_results[:10]}
+        lexical_rescue = {
+            item["id"] for item in chunk_fts_results if item.get("matched_terms", 0) >= 2
+        }
+        allowed_lexical = semantic_pool | lexical_rescue if vector_results else None
+        for rank_index, result in enumerate(fts_results, start=1):
+            if allowed_lexical is not None and result["id"] not in allowed_lexical:
+                continue
+            lexical_score = 0.75 / (rrf_k + rank_index)
+            merged[result["id"]] = {
+                **result,
+                "matched_chunks": [],
+                "_lexical_score": lexical_score,
+                "_rrf_score": lexical_score,
+            }
+        for rank_index, result in enumerate(chunk_fts_results, start=1):
+            article_id = result["id"]
+            if allowed_lexical is not None and article_id not in allowed_lexical:
+                continue
+            lexical_score = 0.75 / (rrf_k + rank_index)
+            if article_id not in merged:
+                merged[article_id] = self._empty_search_result(article_id)
+            previous = merged[article_id].get("_lexical_score", 0.0)
+            if lexical_score > previous:
+                merged[article_id]["_rrf_score"] += lexical_score - previous
+                merged[article_id]["_lexical_score"] = lexical_score
+            self._merge_chunks(merged[article_id]["matched_chunks"], result["matched_chunks"])
+        for rank_index, result in enumerate(vector_results, start=1):
+            article_id = result["id"]
+            if article_id not in merged:
+                merged[article_id] = self._empty_search_result(article_id)
+            # Semantic evidence is the primary signal; lexical ranks mainly disambiguate it.
+            merged[article_id]["_rrf_score"] += 1.5 / (rrf_k + rank_index)
+            merged[article_id]["vector_similarity"] = result.get("vector_similarity")
+            self._merge_chunks(
+                merged[article_id]["matched_chunks"], result.get("matched_chunks", []),
+            )
+
+        if not merged:
+            return []
+        article_ids = list(merged)
+        placeholders = ",".join("?" for _ in article_ids)
+        rows = self.conn.execute(
+            f"""SELECT id, title, category, tags, confidence, last_modified,
+                       version, author, content_type
+                FROM articles_meta WHERE id IN ({placeholders})""",
+            article_ids,
+        ).fetchall()
+        available: set[str] = set()
+        for row in rows:
+            meta = dict(row)
+            article_id = meta["id"]
+            row_tags = json.loads(meta.get("tags") or "[]")
+            if category and meta["category"] != category and not meta["category"].startswith(category + "/"):
+                continue
+            if tags and not set(tags).intersection(row_tags):
+                continue
+            if min_confidence > 0 and meta["confidence"] < min_confidence:
+                continue
+            available.add(article_id)
+            merged[article_id].update({
+                "title": meta["title"], "category": meta["category"], "tags": row_tags,
+                "confidence": meta["confidence"], "last_modified": meta["last_modified"],
+                "version": meta["version"], "author": meta["author"],
+                "type": meta["content_type"],
+            })
+
+        ranked = sorted(
+            (value for key, value in merged.items() if key in available),
+            key=lambda item: item["_rrf_score"], reverse=True,
+        )
+        output: list[dict] = []
+        for item in ranked[:limit]:
+            output.append({
+                key: item[key] for key in (
+                    "id", "title", "category", "tags", "confidence", "last_modified",
+                    "version", "author", "type", "snippet", "rank", "matched_chunks",
+                )
+            } | {
+                "hybrid_score": round(item["_rrf_score"], 6),
+                "vector_similarity": item.get("vector_similarity"),
+            })
+        return output
+
+    @staticmethod
+    def _empty_search_result(article_id: str) -> dict:
+        return {
+            "id": article_id, "title": "", "category": "", "tags": [],
+            "confidence": 0.0, "last_modified": "", "version": 1, "author": "",
+            "type": "", "snippet": "", "rank": 0.0, "matched_chunks": [],
+            "_lexical_score": 0.0, "_rrf_score": 0.0,
+        }
+
+    @staticmethod
+    def _merge_chunks(target: list[dict], additions: list[dict], limit: int = 4) -> None:
+        seen = {item.get("chunk_id") for item in target}
+        for chunk in additions:
+            if chunk.get("chunk_id") in seen:
+                continue
+            target.append(chunk)
+            seen.add(chunk.get("chunk_id"))
+            if len(target) >= limit:
+                break
+
     def _search_fts(
         self,
         query: str,
@@ -451,22 +633,89 @@ class WikiIndex:
 
         return results
 
+    def _search_chunk_fts(self, query: str, limit: int = 50) -> list[dict]:
+        """Return diverse document candidates with exact matching content chunks."""
+        fts_query = " OR ".join(query.split()) if " " in query else query
+        try:
+            rows = self.conn.execute(
+                """SELECT f.chunk_id, f.article_id, f.path, c.text, bm25(article_chunks_fts) AS rank
+                   FROM article_chunks_fts f
+                   JOIN article_chunks c ON c.chunk_id = f.chunk_id
+                   WHERE article_chunks_fts MATCH ?
+                   ORDER BY rank LIMIT ?""",
+                (fts_query, max(limit * 5, limit)),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return []
+        grouped: dict[str, list[dict]] = {}
+        matched_terms_by_article: dict[str, int] = {}
+        order: list[str] = []
+        query_terms = [term.casefold() for term in query.split() if len(term) >= 2]
+        for row in rows:
+            article_id = row["article_id"]
+            if article_id not in grouped:
+                grouped[article_id] = []
+                order.append(article_id)
+            if len(grouped[article_id]) >= 3:
+                continue
+            text = row["text"]
+            matched_terms_by_article[article_id] = max(
+                matched_terms_by_article.get(article_id, 0),
+                sum(term in text.casefold() for term in query_terms),
+            )
+            grouped[article_id].append({
+                "chunk_id": row["chunk_id"],
+                "document_id": article_id,
+                "path": row["path"],
+                "text": text,
+                "keyword_rank": row["rank"],
+                "retrieval_source": "chunk_fts",
+            })
+        return [
+            {
+                "id": article_id, "matched_chunks": grouped[article_id],
+                "matched_terms": matched_terms_by_article.get(article_id, 0),
+            }
+            for article_id in order[:limit]
+        ]
+
     def _search_vector(self, query: str, limit: int = 20) -> list[dict]:
-        """벡터 검색 (내부 메서드). 벡터 DB 없거나 비어있으면 빈 리스트 반환."""
+        """Run semantic retrieval while exposing degraded fallback state."""
         vec_db_path = get_data_dir() / "vectors.db"
         if not vec_db_path.exists():
+            self.last_retrieval_status = {
+                "mode": "keyword_only", "vector_status": "degraded",
+                "vector_error": "vector_index_missing",
+            }
             return []
+        vector_index = None
         try:
             from ai_wiki.vector import VectorIndex
-            vidx = VectorIndex(db_path=vec_db_path)
-            if vidx.count() == 0:
-                vidx.close()
+            vector_index = VectorIndex(db_path=vec_db_path)
+            vector_count = vector_index.count()
+            if vector_count == 0:
+                self.last_retrieval_status = {
+                    "mode": "keyword_only", "vector_status": "degraded",
+                    "vector_error": "vector_index_empty",
+                }
                 return []
-            results = vidx.search(query, limit=limit)
-            vidx.close()
+            results = vector_index.search(query, limit=limit)
+            stale = vector_count != self.count()
+            self.last_retrieval_status = {
+                "mode": "hybrid_degraded" if stale else "hybrid",
+                "vector_status": "degraded" if stale else "ready",
+                "vector_error": "vector_index_stale" if stale else None,
+            }
             return results
-        except Exception:
+        except Exception as exc:
+            self.last_retrieval_status = {
+                "mode": "keyword_only", "vector_status": "degraded",
+                "vector_error": type(exc).__name__,
+            }
             return []
+        finally:
+            if vector_index is not None:
+                vector_index.close()
 
     def find_similar_titles(self, title: str, threshold: float = 0.6) -> list[dict]:
         cur = self.conn.cursor()

@@ -108,8 +108,9 @@ def test_context_budget_citations_and_record_use(wiki_root, wiki_index):
     assert envelope["meta"]["budget"]["estimated_tokens"] <= 1200
     citation = envelope["data"]["citations"][0]
     assert citation["document_id"] == article.id
-    assert citation["path"] == "/content/data/facts"
+    assert citation["path"].startswith("/content/data/")
     assert citation["source_ids"] == ["src-1"]
+    assert envelope["data"]["documents"][0]["evidence"][0]["path"] == citation["path"]
     for issued in envelope["data"]["citations"]:
         document = next(
             item for item in envelope["data"]["documents"]
@@ -118,7 +119,9 @@ def test_context_budget_citations_and_record_use(wiki_root, wiki_index):
         parts = issued["path"].strip("/").split("/")
         assert parts[:2] == ["content", "data"]
         represented_key = parts[2].replace("~1", "/").replace("~0", "~")
-        assert represented_key in document["content"]
+        assert represented_key in document["content"] or any(
+            evidence["path"] == issued["path"] for evidence in document["evidence"]
+        )
 
     usage = _run([
         "record-use", envelope["data"]["context_id"],
@@ -149,9 +152,11 @@ def test_context_includes_query_relevant_nonstandard_field(wiki_root, wiki_index
     envelope = json.loads(_run(["context", "architecture"], wiki_root).output)
     document = envelope["data"]["documents"][0]
 
-    assert document["content"]["architecture"]["layers"][0] == "YAML source"
+    assert document["evidence"][0]["path"].startswith("/content/data/architecture/")
+    assert document["evidence"][0]["text"] in {"YAML source", "SQLite retrieval", "vector retrieval"}
     assert any(
         item["path"] == "/content/data/architecture"
+        or item["path"].startswith("/content/data/architecture/")
         for item in envelope["data"]["citations"]
     )
 

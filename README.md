@@ -55,6 +55,7 @@ Upgrade an existing installation:
 ```bash
 python -m pip install --upgrade ai-wiki
 ai-wiki upgrade-skill
+ai-wiki reindex
 ai-wiki vindex
 ai-wiki doctor
 ```
@@ -66,9 +67,9 @@ Every primary command returns a stable JSON envelope.
 
 ```bash
 ai-wiki capabilities
-ai-wiki context "How does optimistic concurrency protect wiki updates?" --max-tokens 4000
+ai-wiki context "How does optimistic concurrency protect wiki updates?" --max-tokens 4000 --require-vector
 ai-wiki get <document-id> --fields id,title,content.facts,sources
-ai-wiki record-use <context-id> --citation "doc:<id>#/content/data/facts" --outcome answered
+ai-wiki record-use <context-id> --citation "doc:<id>#/content/data/facts/0" --outcome answered
 ```
 
 Reusable knowledge can be written without replacing the whole document:

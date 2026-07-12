@@ -129,6 +129,7 @@ try {
         try {
             $env:PYTHONPATH = Join-Path $repoRoot 'src'
             Invoke-ProcessChecked 'Run canonical test suite' 'python' @('-m', 'pytest', '-q')
+            Invoke-ProcessChecked 'Run Korean vector quality gate' 'python' @('scripts/vector_quality_gate.py')
         }
         finally {
             $env:PYTHONPATH = $oldPythonPath
@@ -162,6 +163,7 @@ try {
     }
     $requiredWheelEntries = @(
         'ai_wiki/lifecycle.py',
+        'ai_wiki/chunking.py',
         'ai_wiki/runtime.py',
         'ai_wiki/skill_routing.py',
         'ai_wiki/skill_templates/SKILL.md',

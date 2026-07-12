@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0 - 2026-07-12
+
+- Replace one-vector-per-document retrieval with deterministic YAML-path chunks and exact chunk citations.
+- Add Korean trigram chunk FTS, multilingual E5 embeddings, document-diverse hybrid fusion, and verified-evidence context packing.
+- Add batched and incremental embedding, atomic full rebuilds, model/dimension migration, and revision-bound score calibration.
+- Expose degraded vector retrieval in context metadata and add `--require-vector`, `vindex --incremental`, and `vcalibrate`.
+- Add a 48-query Korean semantic quality gate covering long-document tails, Recall@5, citations, budgets, and latency.
+
 ## 0.5.0 - 2026-07-12
 
 - Make compact context citations resolve only to values actually included in the AI payload.

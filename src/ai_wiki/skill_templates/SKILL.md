@@ -1,6 +1,6 @@
 ---
 name: ai-wiki
-version: 0.5.0
+version: 0.6.0
 description: AI-first reusable knowledge encyclopedia. Retrieve evidence-linked context before answering, cite document paths, and autonomously write back reusable knowledge through validated create or patch operations.
 user-invocable: true
 argument-hint: "[capabilities|context|get|record-use|patch|create] [query or options]"
@@ -21,7 +21,9 @@ write knowledge. Use a dedicated variant when its manifest triggers match.
 ai-wiki context "question" --max-tokens 4000
 ```
 
-3. Answer from `data.documents` and cite keys from `data.citations`.
+3. Answer from each document's `evidence` chunks and cite only keys from
+   `data.citations`. Treat `meta.retrieval.vector_status != "ready"` as degraded
+   retrieval; use `doctor`, `reindex`, and `vindex` before high-stakes reuse.
 4. Record actual use:
 
 ```bash

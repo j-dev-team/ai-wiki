@@ -1,0 +1,1885 @@
+{
+  "status": "ok",
+  "documents": 16,
+  "queries": 48,
+  "chunks": 108,
+  "indexing_seconds": 27.893,
+  "recall_at_5": 1.0,
+  "citation_accuracy": 1.0,
+  "token_budget_violations": 0,
+  "latency_ms_p50": 45.192,
+  "latency_ms_p95": 53.597,
+  "calibration": {
+    "status": "calibrated",
+    "a": 1.0212724956319692,
+    "b": -0.8495279479868667,
+    "samples": 240,
+    "positives": 48,
+    "negatives": 192,
+    "calibrated_at": "2026-07-12T06:37:54Z"
+  },
+  "results": [
+    {
+      "query": "햇빛으로 전기를 만드는 장치",
+      "expected": "eval-ko-solar-abc123",
+      "ids": [
+        "eval-ko-solar-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-solar-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "태양 복사 에너지를 전력으로 바꾸는 방법",
+      "expected": "eval-ko-solar-abc123",
+      "ids": [
+        "eval-ko-solar-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-solar-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "광전 효과를 이용한 발전 설비",
+      "expected": "eval-ko-solar-abc123",
+      "ids": [
+        "eval-ko-solar-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-solar-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [
+        "eval-ko-solar-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "혈액 속 포도당 농도를 낮추는 호르몬",
+      "expected": "eval-ko-insulin-abc123",
+      "ids": [
+        "eval-ko-insulin-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-insulin-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-insulin-abc123"
+      ],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "췌장에서 분비되어 당 수치를 조절하는 물질",
+      "expected": "eval-ko-insulin-abc123",
+      "ids": [
+        "eval-ko-insulin-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-insulin-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-insulin-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-insulin-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "식후 혈당 관리에 관여하는 호르몬",
+      "expected": "eval-ko-insulin-abc123",
+      "ids": [
+        "eval-ko-insulin-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-insulin-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-version-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-version-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "여러 데이터 변경을 모두 실행하거나 모두 되돌리는 성질",
+      "expected": "eval-ko-atomic-abc123",
+      "ids": [
+        "eval-ko-atomic-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-atomic-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-solar-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-rag-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-backup-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "중간 상태를 남기지 않는 데이터 작업",
+      "expected": "eval-ko-atomic-abc123",
+      "ids": [
+        "eval-ko-version-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-version-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-rag-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-version-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-backup-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "all or nothing 데이터 처리 원칙",
+      "expected": "eval-ko-atomic-abc123",
+      "ids": [
+        "eval-ko-atomic-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-atomic-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-solar-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-rag-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-backup-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "입사할 때 급여와 근무시간을 적는 문서",
+      "expected": "eval-ko-employment-abc123",
+      "ids": [
+        "eval-ko-employment-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-vat-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-employment-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "사용자와 근로자가 근무 조건을 합의한 서류",
+      "expected": "eval-ko-employment-abc123",
+      "ids": [
+        "eval-ko-employment-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-employment-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-employment-abc123"
+      ],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "신규 직원의 보수와 업무 조건을 명시하는 계약",
+      "expected": "eval-ko-employment-abc123",
+      "ids": [
+        "eval-ko-employment-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-version-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-employment-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-employment-abc123"
+      ],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "원본 변경 후 저장된 빠른 복사본을 새로 만드는 절차",
+      "expected": "eval-ko-cache-abc123",
+      "ids": [
+        "eval-ko-cache-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-dismissal-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-cache-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [
+        "eval-ko-version-abc123",
+        "eval-ko-cache-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "오래된 임시 저장 데이터 제거",
+      "expected": "eval-ko-cache-abc123",
+      "ids": [
+        "eval-ko-cache-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-cache-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-rag-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-cache-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-backup-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "데이터 변경 시 캐시 일관성을 유지하는 방법",
+      "expected": "eval-ko-cache-abc123",
+      "ids": [
+        "eval-ko-cache-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-cache-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-solar-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-rag-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-version-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-backup-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "문장의 뜻을 숫자 배열로 바꾸는 기술",
+      "expected": "eval-ko-embedding-abc123",
+      "ids": [
+        "eval-ko-embedding-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-embedding-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "언어 의미의 수학적 좌표 표현",
+      "expected": "eval-ko-embedding-abc123",
+      "ids": [
+        "eval-ko-embedding-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-embedding-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "비슷한 문장을 가까운 숫자 공간에 배치하는 방식",
+      "expected": "eval-ko-embedding-abc123",
+      "ids": [
+        "eval-ko-embedding-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-embedding-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "상품 거래 과정에 붙는 간접세",
+      "expected": "eval-ko-vat-abc123",
+      "ids": [
+        "eval-ko-vat-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-vat-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-vat-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-vat-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "사업자가 매출과 매입을 기준으로 신고하는 세금",
+      "expected": "eval-ko-vat-abc123",
+      "ids": [
+        "eval-ko-vat-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-version-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-vat-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "재화와 서비스 공급에 과세되는 세목",
+      "expected": "eval-ko-vat-abc123",
+      "ids": [
+        "eval-ko-vat-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-rag-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-vat-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-vat-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-vat-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "직원을 내보내기 전에 통지해야 하는 기간",
+      "expected": "eval-ko-dismissal-abc123",
+      "ids": [
+        "eval-ko-dismissal-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-dismissal-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [
+        "eval-ko-dismissal-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "근로관계 종료를 한 달 전에 알리는 제도",
+      "expected": "eval-ko-dismissal-abc123",
+      "ids": [
+        "eval-ko-dismissal-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-dismissal-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [
+        "eval-ko-dismissal-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "해고 전 사전 통보 의무",
+      "expected": "eval-ko-dismissal-abc123",
+      "ids": [
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [
+        "eval-ko-dismissal-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "웹사이트 이름을 네트워크 주소로 바꾸는 시스템",
+      "expected": "eval-ko-dns-abc123",
+      "ids": [
+        "eval-ko-dns-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-encryption-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-dns-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-dns-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-dns-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "도메인으로 서버 IP를 찾는 절차",
+      "expected": "eval-ko-dns-abc123",
+      "ids": [
+        "eval-ko-dns-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-backup-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-dns-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "인터넷 전화번호부 역할을 하는 서비스",
+      "expected": "eval-ko-dns-abc123",
+      "ids": [
+        "eval-ko-dns-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-cache-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-dns-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "식물이 햇빛으로 양분을 만드는 과정",
+      "expected": "eval-ko-photosynthesis-abc123",
+      "ids": [
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "빛 에너지를 화학 에너지로 저장하는 생물 반응",
+      "expected": "eval-ko-photosynthesis-abc123",
+      "ids": [
+        "eval-ko-solar-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-solar-abc123"
+      ],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "잎에서 이산화탄소를 이용해 영양분을 합성하는 작용",
+      "expected": "eval-ko-photosynthesis-abc123",
+      "ids": [
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-photosynthesis-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-photosynthesis-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "돈의 구매력이 떨어지고 상품 가격이 계속 오르는 현상",
+      "expected": "eval-ko-inflation-abc123",
+      "ids": [
+        "eval-ko-inflation-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-inflation-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "경제 전체의 가격 수준 상승",
+      "expected": "eval-ko-inflation-abc123",
+      "ids": [
+        "eval-ko-inflation-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-inflation-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "같은 돈으로 살 수 있는 물건이 줄어드는 상황",
+      "expected": "eval-ko-inflation-abc123",
+      "ids": [
+        "eval-ko-inflation-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-inflation-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "암호화와 복호화에 서로 다른 열쇠를 쓰는 기술",
+      "expected": "eval-ko-encryption-abc123",
+      "ids": [
+        "eval-ko-encryption-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-rag-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-encryption-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [
+        "eval-ko-encryption-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "누구나 아는 키와 소유자만 가진 키의 조합",
+      "expected": "eval-ko-encryption-abc123",
+      "ids": [
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-encryption-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "비대칭 키를 사용하는 보안 방식",
+      "expected": "eval-ko-encryption-abc123",
+      "ids": [
+        "eval-ko-encryption-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-encryption-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-encryption-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-encryption-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "마지막 저장 이후 바뀐 파일만 복사하는 백업",
+      "expected": "eval-ko-backup-abc123",
+      "ids": [
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-rag-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [
+        "eval-ko-backup-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "전체를 매번 복제하지 않는 백업 방식",
+      "expected": "eval-ko-backup-abc123",
+      "ids": [
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-rag-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [
+        "eval-ko-backup-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "변경분만 보관해 용량을 줄이는 데이터 보호",
+      "expected": "eval-ko-backup-abc123",
+      "ids": [
+        "eval-ko-cache-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-cache-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-solar-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-rag-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-backup-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "소스 코드 수정 기록을 추적하는 시스템",
+      "expected": "eval-ko-version-abc123",
+      "ids": [
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-rag-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "이전 파일 상태로 돌아가기 위한 변경 이력 관리",
+      "expected": "eval-ko-version-abc123",
+      "ids": [
+        "eval-ko-version-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-rag-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-version-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [
+        "eval-ko-version-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "여러 개발자의 변경을 합치는 도구",
+      "expected": "eval-ko-version-abc123",
+      "ids": [
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-embedding-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "감염 전에 면역 반응을 준비시키는 의약품",
+      "expected": "eval-ko-vaccine-abc123",
+      "ids": [
+        "eval-ko-vaccine-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-vaccine-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [
+        "eval-ko-dismissal-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "몸이 병원체를 기억하게 만드는 예방 수단",
+      "expected": "eval-ko-vaccine-abc123",
+      "ids": [
+        "eval-ko-vaccine-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-vaccine-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-vaccine-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-vaccine-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "특정 감염병에 대한 방어 능력을 형성하는 제제",
+      "expected": "eval-ko-vaccine-abc123",
+      "ids": [
+        "eval-ko-vaccine-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-encryption-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-vaccine-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [
+        "eval-ko-vaccine-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "문서를 먼저 찾고 그 근거로 AI가 답하는 방식",
+      "expected": "eval-ko-rag-abc123",
+      "ids": [
+        "eval-ko-rag-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-vaccine-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-rag-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "외부 지식을 언어 모델 문맥에 넣는 기술",
+      "expected": "eval-ko-rag-abc123",
+      "ids": [
+        "eval-ko-rag-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-embedding-abc123",
+        "eval-ko-rag-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-insulin-abc123",
+        "eval-ko-solar-abc123"
+      ],
+      "chunk_fts_ids": [],
+      "document_fts_ids": [
+        "eval-ko-rag-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    },
+    {
+      "query": "검색 결과를 활용해 생성 답변의 근거를 강화하는 구조",
+      "expected": "eval-ko-rag-abc123",
+      "ids": [
+        "eval-ko-rag-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-cache-abc123"
+      ],
+      "vector_ids": [
+        "eval-ko-rag-abc123",
+        "eval-ko-embedding-abc123",
+        "eval-ko-version-abc123",
+        "eval-ko-encryption-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-backup-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-vaccine-abc123",
+        "eval-ko-employment-abc123",
+        "eval-ko-inflation-abc123",
+        "eval-ko-atomic-abc123",
+        "eval-ko-dismissal-abc123",
+        "eval-ko-photosynthesis-abc123",
+        "eval-ko-vat-abc123",
+        "eval-ko-insulin-abc123"
+      ],
+      "chunk_fts_ids": [
+        "eval-ko-rag-abc123"
+      ],
+      "document_fts_ids": [
+        "eval-ko-rag-abc123",
+        "eval-ko-solar-abc123",
+        "eval-ko-dns-abc123",
+        "eval-ko-cache-abc123",
+        "eval-ko-backup-abc123"
+      ],
+      "pass": true,
+      "citation_pass": true
+    }
+  ]
+}

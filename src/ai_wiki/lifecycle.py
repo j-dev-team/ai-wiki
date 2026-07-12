@@ -226,6 +226,18 @@ def _validate_refreshed_variant(spec: VariantSpec, package_dir: Path) -> dict[st
         raise RuntimeError(f"command not found after refresh: {spec.command_name}")
     env = os.environ.copy()
     env[f"{spec.env_prefix}_ROOT"] = str(package_dir)
+    maintenance: dict[str, Any] = {}
+    for command in ("reindex", "vindex"):
+        prepared = subprocess.run(
+            [executable, command], cwd=str(package_dir), env=env,
+            text=True, capture_output=True, check=False,
+        )
+        if prepared.returncode != 0:
+            raise RuntimeError((prepared.stderr or prepared.stdout).strip())
+        start = prepared.stdout.find("{")
+        maintenance[command] = (
+            json.loads(prepared.stdout[start:]) if start >= 0 else {"output": prepared.stdout.strip()}
+        )
     completed = subprocess.run([executable, "doctor"], cwd=str(package_dir), env=env, text=True, capture_output=True, check=False)
     if completed.returncode != 0:
         raise RuntimeError((completed.stderr or completed.stdout).strip())
@@ -233,6 +245,9 @@ def _validate_refreshed_variant(spec: VariantSpec, package_dir: Path) -> dict[st
     result = json.loads(completed.stdout[start:])
     if not result.get("vector", {}).get("ready"):
         raise RuntimeError(f"vector validation failed after refresh: {result.get('vector')}")
+    if not result.get("chunk_index", {}).get("ready"):
+        raise RuntimeError(f"chunk index validation failed after refresh: {result.get('chunk_index')}")
+    result["maintenance"] = maintenance
     return result
 
 

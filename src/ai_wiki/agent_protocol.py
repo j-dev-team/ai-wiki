@@ -12,7 +12,7 @@ from typing import Any
 
 from ai_wiki.models import Article
 
-PROTOCOL_VERSION = "1.0"
+PROTOCOL_VERSION = "1.1"
 DEFAULT_CONTEXT_TOKENS = 4000
 MIN_CONTEXT_TOKENS = 256
 MAX_CONTEXT_TOKENS = 100_000
@@ -82,17 +82,64 @@ def is_unverified_draft(article: Article) -> bool:
 
 
 def compact_document(article: Article, *, score: float | None = None,
-                     selection_reason: str | None = None,
-                     query: str | None = None) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+                      selection_reason: str | None = None,
+                      query: str | None = None,
+                      evidence_chunks: list[dict[str, Any]] | None = None,
+                      evidence_limit: int = 3,
+                      compact_content_bytes: int | None = None,
+                      ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     canonical = canonical_document(article)
     content_data = canonical["content"]["data"]
     compact_content: dict[str, Any] = {}
-    for key in _query_relevant_content_keys(content_data, query):
-        compact_content[key] = copy.deepcopy(content_data[key])
-    for key in COMPACT_CONTENT_PRIORITY:
-        if key in content_data and key not in compact_content:
-            compact_content[key] = copy.deepcopy(content_data[key])
-    if not compact_content:
+    raw_evidence = [
+        chunk for chunk in (evidence_chunks or [])
+        if str(chunk.get("path", "")).startswith("/content/data")
+    ]
+    verification_paths = [
+        item.get("path", "/content/data")
+        for item in canonical.get("verification", [])
+        if item.get("level", "unverified") != "unverified"
+    ]
+    raw_evidence.sort(key=lambda chunk: not any(
+        chunk.get("path") == path or str(chunk.get("path", "")).startswith(path.rstrip("/") + "/")
+        for path in verification_paths
+    ))
+    evidence_chunks = []
+    evidence_bytes = 0
+    for chunk in raw_evidence:
+        size = len(str(chunk.get("text", "")).encode("utf-8"))
+        if evidence_chunks and evidence_bytes + size > 2400:
+            continue
+        evidence_chunks.append(chunk)
+        evidence_bytes += size
+        if len(evidence_chunks) >= evidence_limit:
+            break
+    evidence_keys: list[str] = []
+    for chunk in evidence_chunks:
+        parts = _decode_pointer(chunk.get("path", ""))
+        if len(parts) >= 3 and parts[:2] == ["content", "data"]:
+            evidence_keys.append(parts[2])
+    candidate_keys = [
+        *_query_relevant_content_keys(content_data, query),
+        *evidence_keys,
+        *COMPACT_CONTENT_PRIORITY,
+    ]
+    compact_bytes = 0
+    compact_limit = (
+        compact_content_bytes if compact_content_bytes is not None
+        else (800 if evidence_chunks else 2400)
+    )
+    compact_field_limit = 0 if evidence_chunks and compact_limit <= 0 else (2 if evidence_chunks else 6)
+    for key in dict.fromkeys(candidate_keys):
+        if key not in content_data or len(compact_content) >= compact_field_limit:
+            continue
+        value = copy.deepcopy(content_data[key])
+        value_bytes = len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+        if evidence_chunks and compact_bytes + value_bytes > compact_limit:
+            continue
+        compact_content[key] = value
+        compact_bytes += value_bytes
+    if not compact_content and not evidence_chunks:
         for key in list(content_data)[:5]:
             compact_content[key] = copy.deepcopy(content_data[key])
 
@@ -112,7 +159,33 @@ def compact_document(article: Article, *, score: float | None = None,
         except (KeyError, IndexError, ValueError, TypeError, ProtocolFailure):
             return False
 
-    for verification in canonical.get("verification", []):
+    if evidence_chunks:
+        for chunk in evidence_chunks:
+            path = chunk.get("path", "")
+            if not pointer_exists(path):
+                continue
+            matching = []
+            for verification in canonical.get("verification", []):
+                verified_path = verification.get("path", "/content/data")
+                if path == verified_path or path.startswith(verified_path.rstrip("/") + "/"):
+                    matching.append(verification)
+            verification = matching[0] if matching else {}
+            valid_ids = [item for item in verification.get("source_ids", []) if item in source_ids]
+            if not valid_ids and sources:
+                valid_ids = sorted(source_ids)
+            key = f"doc:{article.id}#{path}"
+            if key in seen:
+                continue
+            seen.add(key)
+            citations.append({
+                "key": key,
+                "document_id": article.id,
+                "path": path,
+                "level": verification.get("level", "sourced" if sources else "unverified"),
+                "source_ids": valid_ids,
+                "chunk_id": chunk.get("chunk_id"),
+            })
+    for verification in ([] if evidence_chunks else canonical.get("verification", [])):
         valid_ids = [item for item in verification.get("source_ids", []) if item in source_ids]
         path = verification.get("path", "/content/data")
         if path == "/content/data":
@@ -138,7 +211,7 @@ def compact_document(article: Article, *, score: float | None = None,
                 "level": verification.get("level", "unverified"),
                 "source_ids": valid_ids,
             })
-    if not citations and sources:
+    if not citations and sources and not evidence_chunks:
         for content_key in compact_content:
             path = f"/content/data/{_encode_pointer_part(content_key)}"
             citations.append({
@@ -160,6 +233,14 @@ def compact_document(article: Article, *, score: float | None = None,
         "modified_at": canonical["metadata"]["modified_at"],
         "verification_status": "pending" if is_unverified_draft(article) else "active",
         "content": compact_content,
+        "evidence": [
+            {
+                key: chunk[key] for key in (
+                    "chunk_id", "path", "text", "vector_similarity", "retrieval_source",
+                ) if key in chunk
+            }
+            for chunk in evidence_chunks
+        ],
         "sources": sources,
         "citations": [item["key"] for item in citations],
     }
@@ -193,7 +274,8 @@ def project_fields(document: dict[str, Any], fields: str | None) -> dict[str, An
 def build_context(index, query: str, *, max_tokens: int = DEFAULT_CONTEXT_TOKENS,
                   limit: int = 8, category: str | None = None,
                   tags: list[str] | None = None,
-                  include_unverified: bool = False) -> dict[str, Any]:
+                  include_unverified: bool = False,
+                  require_vector: bool = False) -> dict[str, Any]:
     from ai_wiki.storage import load_article
 
     if not MIN_CONTEXT_TOKENS <= max_tokens <= MAX_CONTEXT_TOKENS:
@@ -204,14 +286,28 @@ def build_context(index, query: str, *, max_tokens: int = DEFAULT_CONTEXT_TOKENS
     if not 1 <= limit <= 50:
         raise ProtocolFailure("invalid_limit", "limit must be between 1 and 50")
 
-    ranked = index.search(query, category=category, tags=tags, limit=20)
+    try:
+        ranked = index.search(
+            query, category=category, tags=tags, limit=20,
+            require_vector=require_vector,
+        )
+    except Exception as exc:
+        from ai_wiki.vector import VectorSearchUnavailable
+        if isinstance(exc, VectorSearchUnavailable):
+            raise ProtocolFailure(
+                "vector_unavailable", str(exc),
+                details={"reason": exc.code}, retryable=True,
+            ) from exc
+        raise
     direct_candidates: list[tuple[Article, float, str]] = []
+    chunks_by_id: dict[str, list[dict[str, Any]]] = {}
     seen: set[str] = set()
     for result in ranked:
         article = load_article(result["id"])
         if not article or article.id in seen:
             continue
         seen.add(article.id)
+        chunks_by_id[article.id] = list(result.get("matched_chunks", []))
         direct_candidates.append((article, float(result.get("hybrid_score", 0.0)), "hybrid"))
 
     direct_by_id = {article.id: (article, score, reason) for article, score, reason in direct_candidates}
@@ -254,17 +350,36 @@ def build_context(index, query: str, *, max_tokens: int = DEFAULT_CONTEXT_TOKENS
             continue
         document, document_citations = compact_document(
             article, score=round(score, 6), selection_reason=reason, query=query,
+            evidence_chunks=chunks_by_id.get(article.id),
+            evidence_limit=1,
+            compact_content_bytes=0,
         )
-        trial_data = {
-            "context_id": context_id,
-            "query": query,
-            "documents": documents + [document],
-            "citations": citations + document_citations,
-        }
-        trial = success(trial_data, meta={
-            "budget": {"max_tokens": max_tokens, "estimated_tokens": 0, "truncated": False},
-            "excluded_unverified": excluded_unverified,
-        })
+        def make_trial() -> dict[str, Any]:
+            trial_data = {
+                "context_id": context_id,
+                "query": query,
+                "documents": documents + [document],
+                "citations": citations + document_citations,
+            }
+            return success(trial_data, meta={
+                "budget": {"max_tokens": max_tokens, "estimated_tokens": 0, "truncated": False},
+                "excluded_unverified": excluded_unverified,
+            })
+
+        trial = make_trial()
+        while estimate_tokens(trial) > max_tokens and document.get("content"):
+            document["content"].pop(next(reversed(document["content"])))
+            truncated = True
+            trial = make_trial()
+        while estimate_tokens(trial) > max_tokens and len(document.get("evidence", [])) > 1:
+            removed_evidence = document["evidence"].pop()
+            removed_chunk_id = removed_evidence.get("chunk_id")
+            document_citations[:] = [
+                item for item in document_citations if item.get("chunk_id") != removed_chunk_id
+            ]
+            document["citations"] = [item["key"] for item in document_citations]
+            truncated = True
+            trial = make_trial()
         if estimate_tokens(trial) > max_tokens:
             truncated = True
             continue
@@ -276,6 +391,7 @@ def build_context(index, query: str, *, max_tokens: int = DEFAULT_CONTEXT_TOKENS
         "budget": {"max_tokens": max_tokens, "estimated_tokens": 0, "truncated": truncated},
         "excluded_unverified": excluded_unverified,
         "candidate_count": len(candidates),
+        "retrieval": dict(getattr(index, "last_retrieval_status", {})),
     }
     envelope = success(data, meta=meta)
     while True:

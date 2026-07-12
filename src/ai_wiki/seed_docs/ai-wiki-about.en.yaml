@@ -65,7 +65,7 @@ content:
       - "The shared engine is PyPI ai-wiki __ENGINE_VERSION__ and the AI protocol version is 1.0."
       - "Primary AI responses contain protocol_version, status, data, meta, and error."
       - "YAML documents are durable sources of truth; wiki.db and vectors.db are derived indexes."
-      - "Default retrieval fuses FTS5 keyword and sentence-transformers/sqlite-vec semantic ranks with RRF."
+      - "Default retrieval fuses document FTS5, trigram chunk FTS, multilingual E5, and sqlite-vec chunk ranks with RRF."
       - "context combines search and relation candidates within a default 4,000 estimated-token budget."
       - "Citations use doc:<document-id>#<JSON Pointer> to identify a precise evidence path."
       - "patch supports a safe RFC 6902 subset and requires optimistic if-version checks."
@@ -87,7 +87,7 @@ content:
     architecture:
       durable_storage: schema v2 YAML under articles/<category>/<subcategory>/<slug>.yaml
       metadata_index: SQLite metadata and FTS5 full-text search in data/wiki.db
-      vector_index: sqlite-vec embeddings and vector metadata in data/vectors.db
+      vector_index: JSON-path chunk embeddings and vector metadata in data/vectors.db
       source_archive: ingested originals under sources
       operation_history: operation logs and Git auto-commits
       agent_interface: "__WIKI_COMMAND_NAME__ CLI with protocol 1.0 JSON envelopes"
@@ -156,11 +156,11 @@ content:
       - Treat the web UI as a review surface rather than a replacement for the AI protocol.
     current_release:
       engine_version: __ENGINE_VERSION__
-      protocol_version: "1.0"
+      protocol_version: "1.1"
       distribution: [GitHub, PyPI]
       install_command: pip install ai-wiki
       wiki_command: __WIKI_COMMAND_NAME__
-      local_vector_requirement: article and vector counts must match and vector.ready must be true.
+      local_vector_requirement: article and vector-document counts must match, with both chunk indexes ready.
     use_cases:
       - Reuse researched knowledge and troubleshooting across sessions.
       - Accumulate research that needs sources and claim-level verification.

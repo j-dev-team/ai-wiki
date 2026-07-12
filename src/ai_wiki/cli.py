@@ -971,7 +971,11 @@ def capabilities():
         "protocol_version": PROTOCOL_VERSION,
         "commands": {
             "get": {"views": ["compact", "full", "raw"], "default": "compact"},
-            "context": {"default_max_tokens": 4000, "default_limit": 8},
+            "context": {
+                "default_max_tokens": 4000, "default_limit": 8,
+                "retrieval": ["document_fts", "chunk_fts", "chunk_vector", "relations"],
+                "require_vector_supported": True,
+            },
             "record-use": {"outcomes": ["answered", "insufficient"]},
             "patch": {"operations": ["test", "add", "replace", "remove"], "if_version_required": True},
             "create": {"document_file": "JSON path or - for stdin"},
@@ -988,14 +992,17 @@ def capabilities():
 @click.option("--category", default=None)
 @click.option("--tag", "tags", multiple=True)
 @click.option("--include-unverified", is_flag=True)
+@click.option("--require-vector", is_flag=True,
+              help="Fail instead of using keyword-only retrieval when vectors are unavailable.")
 @click.pass_context
-def context_cmd(ctx, query, max_tokens, limit, category, tags, include_unverified):
+def context_cmd(ctx, query, max_tokens, limit, category, tags, include_unverified, require_vector):
     """Build an evidence-linked context package within a token budget."""
     try:
         envelope = build_context(
             ctx.obj["index"], query, max_tokens=max_tokens, limit=limit,
             category=category, tags=list(tags) or None,
             include_unverified=include_unverified,
+            require_vector=require_vector,
         )
         output_json(envelope)
     except ProtocolFailure as exc:
@@ -2187,6 +2194,8 @@ def _vector_status(idx: WikiIndex | None = None, load_model: bool = False) -> di
         "vectors_db": str(vec_db_path),
         "vectors_db_exists": vec_db_path.exists(),
         "vector_count": 0,
+        "chunk_count": 0,
+        "embedding": {},
         "article_count": article_count,
         "warnings": [],
         "actions": [],
@@ -2223,13 +2232,23 @@ def _vector_status(idx: WikiIndex | None = None, load_model: bool = False) -> di
             from ai_wiki.vector import VectorIndex
             vidx = VectorIndex(db_path=vec_db_path)
             status["vector_count"] = vidx.count()
+            status["chunk_count"] = vidx.chunk_count()
+            status["embedding"] = vidx.state()
+            if status["embedding"].get("rebuild_required"):
+                status["warnings"].append(
+                    f"vector index requires rebuild: {status['embedding'].get('rebuild_reason')}"
+                )
+                status["actions"].append(f"Rebuild vector index: {COMMAND_NAME} vindex")
             vidx.close()
         except Exception as e:
             status["warnings"].append(f"vector index unavailable: {e}")
             status["actions"].append(f"Rebuild vector index: {COMMAND_NAME} vindex")
 
     if article_count is not None:
-        status["indexed"] = article_count == 0 or status["vector_count"] >= article_count
+        status["indexed"] = (
+            (article_count == 0 or status["vector_count"] >= article_count)
+            and not status["embedding"].get("rebuild_required", False)
+        )
         if article_count > 0 and status["vector_count"] < article_count:
             status["actions"].append(f"Vector index is stale or empty. Run: {COMMAND_NAME} vindex")
     else:
@@ -2253,10 +2272,22 @@ def _vector_status(idx: WikiIndex | None = None, load_model: bool = False) -> di
 def doctor(ctx, load_model):
     """Diagnose wiki storage, search index, and required vector search readiness."""
     idx: WikiIndex = ctx.obj["index"]
+    article_count = idx.count()
+    chunk_documents = idx.chunk_document_count()
+    chunk_status = {
+        "ready": article_count == chunk_documents,
+        "document_count": chunk_documents,
+        "chunk_count": idx.chunk_count(),
+        "article_count": article_count,
+        "actions": [] if article_count == chunk_documents else [
+            f"Rebuild keyword chunk index: {COMMAND_NAME} reindex"
+        ],
+    }
     output_json({
         "status": "ok",
         "wiki_root": str(get_wiki_root()),
-        "article_count": idx.count(),
+        "article_count": article_count,
+        "chunk_index": chunk_status,
         "vector": _vector_status(idx=idx, load_model=load_model),
     })
 
@@ -2355,19 +2386,81 @@ def similar(ctx, article_id, limit, method):
 
 
 @cli.command("vindex")
+@click.option("--incremental", is_flag=True,
+              help="Embed only documents whose chunk content or version changed.")
 @click.pass_context
-def vector_reindex(ctx):
+def vector_reindex(ctx, incremental):
     """Rebuild the vector index (embed all documents)."""
     try:
         from ai_wiki.vector import VectorIndex
         articles = list_all_articles()
-        vidx = VectorIndex()
-        count = vidx.rebuild(articles)
-        vidx.close()
+        vidx = None
+        if incremental:
+            vidx = VectorIndex()
+            details = vidx.upsert_many(articles, rebuild=False)
+        else:
+            details = VectorIndex.rebuild_atomic(articles)
+        if not isinstance(details, dict):
+            vidx = VectorIndex()
+            count = vidx.rebuild(articles)
+            details = {
+                "documents": count, "updated_documents": count,
+                "skipped_documents": 0, "chunks": 0, "embedded_chunks": 0,
+            }
+        count = details["documents"]
+        if vidx is not None:
+            vidx.close()
         append_log("vindex", details=f"indexed={count}")
-        output_json({"status": "ok", "action": "vector_reindexed", "article_count": count})
+        output_json({
+            "status": "ok",
+            "action": "vector_index_updated" if incremental else "vector_reindexed",
+            "article_count": count, **details,
+        })
     except Exception as e:
         output_error(msg("vector_index_error", e), "vector_error")
+
+
+@cli.command("vcalibrate")
+@click.option("--eval-file", required=True, type=click.Path(exists=True, dir_okay=False),
+              help="JSON file containing cases with query and relevant_ids fields.")
+def vector_calibrate(eval_file):
+    """Calibrate semantic acceptance scores for the current corpus and model."""
+    vector_index = None
+    try:
+        payload = json.loads(Path(eval_file).read_text(encoding="utf-8"))
+        cases = payload.get("cases", []) if isinstance(payload, dict) else []
+        if not cases:
+            raise ValueError("evaluation file must contain a non-empty cases list")
+        from ai_wiki.vector import VectorIndex
+        vector_index = VectorIndex()
+        samples: list[tuple[float, int]] = []
+        passed = 0
+        for case in cases:
+            query = case.get("query")
+            relevant = set(case.get("relevant_ids", []))
+            if not isinstance(query, str) or not query or not relevant:
+                raise ValueError("each case requires query and relevant_ids")
+            results = vector_index.search(query, limit=20)
+            result_ids = [item["id"] for item in results]
+            passed += int(bool(relevant.intersection(result_ids[:5])))
+            found_relevant = False
+            for result in results:
+                label = int(result["id"] in relevant)
+                found_relevant = found_relevant or bool(label)
+                samples.append((float(result["vector_similarity"]), label))
+            if not found_relevant:
+                samples.append((-1.0, 1))
+        calibration = vector_index.calibrate(samples)
+        output_json({
+            "status": "ok", "action": "vector_calibrated",
+            "cases": len(cases), "recall_at_5": passed / len(cases),
+            **calibration,
+        })
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        output_error(str(exc), "vector_calibration_error")
+    finally:
+        if vector_index is not None:
+            vector_index.close()
 
 
 # ── #10: Autonomous maintenance ────────────────────────

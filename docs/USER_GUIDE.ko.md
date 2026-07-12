@@ -184,7 +184,9 @@ ai-wiki delete <문서-ID> --confirm
 ai-wiki search "근로계약서 작성 기준"
 ```
 
-기본 검색은 FTS5 키워드 검색과 벡터 의미 검색을 RRF 방식으로 결합합니다.
+기본 검색은 문서 FTS5, 한국어 trigram 청크 FTS, 청크 벡터 의미 검색을
+문서 다양성을 유지하는 RRF 방식으로 결합합니다. `context`의 `evidence`에는
+원본 YAML의 `/content/data/...` 경로와 해당 청크 본문이 함께 들어갑니다.
 
 ### 순수 벡터 검색
 
@@ -198,11 +200,28 @@ ai-wiki vsearch "직원을 해고할 때 확인할 사항"
 
 ```powershell
 ai-wiki doctor
+ai-wiki reindex
 ai-wiki vindex
 ai-wiki doctor
 ```
 
-문서 수와 벡터 수가 다르거나 `vector.ready`가 `false`이면 `vindex`를 실행합니다. 최초 실행은 임베딩 모델을 내려받으므로 시간이 걸릴 수 있습니다.
+`chunk_index.ready`가 `false`이면 `reindex`를 실행합니다. 문서 수와 벡터 문서
+수가 다르거나 `vector.ready`가 `false`이면 `vindex`를 실행합니다. 최초 실행은
+다국어 임베딩 모델을 내려받으므로 시간이 걸릴 수 있습니다. 변경된 문서만
+다시 임베딩하려면 `ai-wiki vindex --incremental`을 사용합니다.
+
+벡터 검색이 반드시 필요한 AI 작업은 다음처럼 폴백을 금지할 수 있습니다.
+
+```powershell
+ai-wiki context "질문" --require-vector
+```
+
+위키별 정답 문서 평가 JSON이 있으면 유사도 수치를 해당 말뭉치에 맞춰 보정할
+수 있습니다.
+
+```powershell
+ai-wiki vcalibrate --eval-file retrieval-eval.json
+```
 
 ## 6. 웹 UI
 

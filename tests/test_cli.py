@@ -56,7 +56,7 @@ def test_create_and_get(tmp_path):
     result = _run(runner, ["get", article_id], wiki_root)
     data = json.loads(result.output)
     assert data["status"] == "ok"
-    assert data["protocol_version"] == "1.0"
+    assert data["protocol_version"] == "1.1"
     assert data["data"]["document"]["title"] == "Test CLI Article"
 
     legacy = _run(runner, ["get", article_id, "--legacy"], wiki_root)
