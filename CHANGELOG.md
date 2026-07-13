@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.3 - 2026-07-13
+
+- Refresh the Korean README and integrated user guide for the current 1.1 release: correct obsolete 0.2/0.4 labels and links, document Mission compact execution reads, entity-first temporal authoring, current `template` usage, and the local/team security boundary.
+
 ## 1.1.2 - 2026-07-13
 
 - Add entity-first temporal authoring: canonical entity attributes, explicit event-to-event links, and source-backed event participants precede narrative prose.

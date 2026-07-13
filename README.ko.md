@@ -4,9 +4,9 @@ AI Wiki는 AI가 지식을 검색하고 읽고 부분 수정하며 재사용하�
 
 [English README](https://github.com/j-dev-team/ai-wiki/blob/master/README.md)
 
-[AI Wiki 0.4 통합 사용설명서](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md) | [목적별 독립 위키 안내](https://github.com/j-dev-team/ai-wiki/blob/master/docs/VARIANTS.md)
+[AI Wiki 1.1.3 통합 사용설명서](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md) | [목적별 독립 위키 안내](https://github.com/j-dev-team/ai-wiki/blob/master/docs/VARIANTS.md)
 
-> 보안 안내: AI Wiki는 인증/권한 관리 기능이 없습니다. 로컬 전용 도구로 사용하세요. 웹 UI나 데이터 디렉터리를 외부 네트워크에 노출하지 마세요. 데이터는 로컬 파일에 평문으로 저장됩니다.
+> 보안 안내: 기본 설치는 로컬 전용이며 외부 네트워크에 공개하면 안 됩니다. 팀 환경에는 `pip install "ai-wiki[team]"`으로 인증 세션, API 토큰, RBAC, CSRF·속도 제한, 감사 로그와 민감 필드 암호화를 추가할 수 있습니다. 전체 저장소와 운영체제 계정 보호는 별도로 관리해야 합니다.
 
 ## 핵심 특징
 
@@ -18,6 +18,8 @@ AI Wiki는 AI가 지식을 검색하고 읽고 부분 수정하며 재사용하�
 - AI 에이전트 연동: Claude Code, Antigravity CLI의 Gemini, GPT Codex용 skill 파일 생성
 - 로컬 웹 UI: 검색, 문서 조회/작성/수정, 그래프, 대시보드 제공
 - 운영 명령: `doctor`, `lint`, `maintain`, `quality`, `todo`, `gaps`, `stale`, `vindex`
+- Mission 작업 관리: revision 고정 계획, 승인, 작업 lease, 완료 기준별 증거, 독립 검토와 인계
+- 시간·엔터티 지식: 사실의 유효 시점과 출처를 보존하고, 사건·참여자·연속 이벤트를 연결
 
 ## 설치
 
@@ -28,7 +30,7 @@ python -m pip install ai-wiki
 ai-wiki init D:\wiki\my-wiki
 
 # 초기화 시 위키 구조, AI 작업 흐름, 출처와 검증 경로를 설명하는
-# 상세 schema v2 자기참조 문서가 자동으로 생성됩니다.
+# 자기참조 문서가 자동으로 생성됩니다.
 ```
 
 기존 설치본 업그레이드:
@@ -96,7 +98,7 @@ ai-wiki variant install law-wiki `
 ## 문서 생성 예시
 
 ```powershell
-ai-wiki create-template technology --output content.yaml
+ai-wiki template technology --output content.yaml
 # content.yaml의 예시 값을 실제 내용과 출처로 수정합니다.
 
 ai-wiki create `

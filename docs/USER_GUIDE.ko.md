@@ -1,6 +1,6 @@
-# AI Wiki 0.4 사용자 설명서
+# AI Wiki 1.1.3 사용자 설명서
 
-이 문서는 Windows에서 AI Wiki를 설치하고 일반 위키와 목적별 위키를 운영하는 전체 절차를 설명합니다. AI Wiki는 인증과 권한 관리가 없는 로컬 전용 프로그램입니다. 웹 서버를 인터넷에 공개하지 말고, 고객 정보나 민감정보가 있는 위키는 사용자 계정과 디스크 접근 권한도 함께 보호하세요.
+이 문서는 Windows에서 AI Wiki 1.1.3을 설치하고 일반 위키와 목적별 위키를 운영하는 전체 절차를 설명합니다. 기본 설치는 로컬 전용입니다. 웹 서버를 인터넷에 공개하지 말고, 고객 정보나 민감정보가 있는 위키는 사용자 계정과 디스크 접근 권한도 함께 보호하세요. 팀용 인증·권한·감사 기능이 필요하면 `python -m pip install "ai-wiki[team]"`을 사용하고, 전체 저장소 암호화와 운영체제 접근 통제는 별도로 적용합니다.
 
 ## 1. 준비 사항
 
@@ -40,9 +40,10 @@ ai-wiki vindex
 ai-wiki doctor
 ```
 
-`migrate-schema`는 검사만 수행합니다. v0.4는 기존 v1 문서를 읽을 때 내부에서
-정규화하고 실제로 수정된 문서만 v2로 저장하므로 일괄 `--apply`는 필요하지
-않습니다. 사용자가 명시적으로 일괄 변환을 결정한 경우에만 백업 후 실행합니다.
+`migrate-schema`는 검사만 수행합니다. 1.1.3은 기존 v1·v2 문서를 읽을 때
+정규화하고 실제로 수정된 문서만 현재 스키마로 저장하므로 일괄 `--apply`는 필요하지
+않습니다. 시간 지식·엔터티·이벤트 연결을 새로 추가하는 문서만 v3 확장을 사용합니다.
+사용자가 명시적으로 일괄 변환을 결정한 경우에만 백업 후 실행합니다.
 
 정상 결과의 기준은 다음과 같습니다.
 
@@ -119,7 +120,7 @@ ai-wiki-web
 ### 작성용 YAML 만들기
 
 ```powershell
-ai-wiki create-template technology --output content.yaml
+ai-wiki template technology --output content.yaml
 ```
 
 `content.yaml`을 편집합니다.
@@ -233,9 +234,27 @@ ai-wiki-web
 - 다른 포트 사용: `ai-wiki-web 5010`
 - 화면 언어: 웹 UI의 한국어/English 선택 사용
 
-서버를 종료하려면 실행 중인 터미널에서 `Ctrl+C`를 누릅니다. AI Wiki에는 로그인 기능이 없으므로 `0.0.0.0` 외부 바인딩이나 공유기 포트 개방을 하지 마세요.
+서버를 종료하려면 실행 중인 터미널에서 `Ctrl+C`를 누릅니다. 기본 설치는 로컬 전용이므로 `0.0.0.0` 외부 바인딩이나 공유기 포트 개방을 하지 마세요. 팀 모드를 설치했더라도 외부 공개 전에는 HTTPS, 운영체제·네트워크 접근 통제, 백업과 비밀 관리까지 별도로 검토해야 합니다.
 
-## 7. 목적별 독립 위키
+## 7. Mission으로 AI 작업 관리
+
+Mission은 조사 보고서, 승인된 작업 계획, 실행 작업, 완료 기준별 증거, 독립 검토와 인계를 revision으로 연결합니다. AI가 긴 작업을 재개할 때는 전체 이력 대신 다음 작업에 필요한 최소 완전 컨텍스트를 읽습니다.
+
+```powershell
+# 실행 중인 Mission의 진행률과 다음 작업 확인
+ai-wiki run summary <run-id>
+ai-wiki run next <run-id>
+
+# 특정 작업에 필요한 계획·기준·기존 증거만 읽기
+ai-wiki task context <run-id> <task-id>
+
+# 특정 완료 기준의 증거만 검토하기
+ai-wiki run evidence <run-id> --criterion <criterion-id>
+```
+
+전체 감사 원장은 독립 검토나 장애 분석이 필요할 때만 `ai-wiki run status <run-id> --full`로 확인합니다. Mission 실행 절차는 설치된 `ai-wiki-missions` 스킬을 사용합니다.
+
+## 8. 목적별 독립 위키
 
 ### 제공 프리셋 확인
 
@@ -302,7 +321,7 @@ agy
 | Antigravity CLI의 Gemini | `~/.gemini/config/skills/<위키명>/` |
 | GPT Codex | `~/.codex/skills/<위키명>/` |
 
-## 8. 사용자 정의 위키
+## 9. 사용자 정의 위키
 
 내장 프리셋에 없는 분야도 매니페스트로 만들 수 있습니다.
 
@@ -330,7 +349,7 @@ ai-wiki variant install `
 
 패키지명, 명령 이름, 환경변수 접두사, 설정 파일, 웹 포트가 다른 위키와 겹치지 않게 설정해야 합니다.
 
-## 9. 백업, 복원, 업데이트, 제거
+## 10. 백업, 복원, 업데이트, 제거
 
 ### 백업
 
@@ -386,7 +405,7 @@ ai-wiki variant uninstall D:\dev\law-wiki --purge --yes
 
 `--purge --yes`는 패키지 루트를 삭제합니다. 이 명령은 자동 백업을 만든 뒤 실행되지만, 백업 파일 위치를 확인하기 전에는 반복 실행하지 마세요.
 
-## 10. 여러 위키 점검
+## 11. 여러 위키 점검
 
 설정, 명령, DB, 환경변수와 포트가 서로 겹치지 않는지 검사합니다.
 
@@ -406,7 +425,7 @@ ai-wiki variant audit-skills `
   D:\dev\tax-wiki
 ```
 
-## 11. 정기 관리
+## 12. 정기 관리
 
 ```powershell
 ai-wiki doctor
@@ -423,7 +442,7 @@ ai-wiki verify-queue
 - 업그레이드 전: 백업
 - 중요한 데이터 변경 후: 별도 외장 디스크나 보호된 저장소에 백업 복사
 
-## 12. 문제 해결
+## 13. 문제 해결
 
 ### `ai-wiki` 명령을 찾지 못함
 
@@ -473,7 +492,7 @@ ai-wiki upgrade-skill
 ai-wiki variant install-skills D:\dev\law-wiki --agent codex
 ```
 
-## 13. 데이터 위치와 보안
+## 14. 데이터 위치와 보안
 
 일반 위키의 기본 구조는 다음과 같습니다.
 
