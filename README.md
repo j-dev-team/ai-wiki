@@ -6,7 +6,7 @@ A CLI-based knowledge wiki system that stores, searches, and manages knowledge l
 
 [Korean User Guide](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md) | [Purpose-Specific Wiki Guide](https://github.com/j-dev-team/ai-wiki/blob/master/docs/VARIANTS.md)
 
-> **Security Notice**: Local mode remains the default and must not be exposed to a network. Optional team mode adds authenticated sessions, API tokens, RBAC, CSRF, rate limiting, audit logs, and sensitive-field encryption; install it with `pip install "ai-wiki[team]"`. Full repository encryption remains the operating system's responsibility.
+> **Local-only notice**: AI Wiki is designed for one local user and must not be exposed to a network. It needs no account, login, or server configuration. Protect the local OS account and the wiki directory; full-repository encryption is the operating system's responsibility.
 
 ---
 

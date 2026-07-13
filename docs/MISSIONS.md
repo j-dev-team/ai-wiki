@@ -46,16 +46,9 @@ Completed tasks require evidence for every criterion. WorkRun history and
 execution events are append-only. Expired leases make a task claimable again,
 but never trigger automatic external execution.
 
-## Team Mode
+## Local Operation Boundary
 
-```bash
-pip install "ai-wiki[team]"
-ai-wiki team user-add owner --role owner
-export AI_WIKI_TEAM_MODE=1
-export AI_WIKI_SECRET="a persistent random session secret"
-ai-wiki-web
-```
-
-Team mode uses Argon2id password hashes, hashed API tokens, CSRF protection,
-secure cookies, rate limiting, and audit records. Connector tokens and
-encryption keys must be `env:` references and are never written into wiki YAML.
+Missions are designed for one local operator and locally running agents. They
+do not require accounts, login, shared hosting, or network exposure. Keep the
+web UI bound to the local machine and protect the wiki directory through the
+operating system account and filesystem permissions.

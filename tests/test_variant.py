@@ -92,7 +92,7 @@ def test_variant_create_generates_independent_package(tmp_path):
     assert "content.identity_handling" in skill_text
     assert "Entity-First Event Authoring" in skill_text
     assert "timeline_contract" in skill_text
-    assert "version: 1.1.3" in skill_text
+    assert "version: 1.1.4" in skill_text
     assert (package_dir / "src" / "law_wiki" / "variant.yaml").exists()
 
     manifest = yaml.safe_load((package_dir / "variant.yaml").read_text(encoding="utf-8"))

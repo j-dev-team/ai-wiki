@@ -4,9 +4,9 @@ AI Wiki는 AI가 지식을 검색하고 읽고 부분 수정하며 재사용하�
 
 [English README](https://github.com/j-dev-team/ai-wiki/blob/master/README.md)
 
-[AI Wiki 1.1.3 통합 사용설명서](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md) | [목적별 독립 위키 안내](https://github.com/j-dev-team/ai-wiki/blob/master/docs/VARIANTS.md)
+[AI Wiki 1.1.4 통합 사용설명서](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md) | [목적별 독립 위키 안내](https://github.com/j-dev-team/ai-wiki/blob/master/docs/VARIANTS.md)
 
-> 보안 안내: 기본 설치는 로컬 전용이며 외부 네트워크에 공개하면 안 됩니다. 팀 환경에는 `pip install "ai-wiki[team]"`으로 인증 세션, API 토큰, RBAC, CSRF·속도 제한, 감사 로그와 민감 필드 암호화를 추가할 수 있습니다. 전체 저장소와 운영체제 계정 보호는 별도로 관리해야 합니다.
+> 로컬 단독 사용 안내: AI Wiki는 한 명이 PC에서 단독으로 쓰는 것을 기준으로 하며, 계정·로그인·서버 설정이 필요 없습니다. 웹 UI와 데이터 디렉터리를 외부 네트워크에 공개하지 말고, 운영체제 계정과 위키 폴더 접근 권한을 보호하세요. 전체 저장소 암호화는 운영체제의 책임입니다.
 
 ## 핵심 특징
 
