@@ -250,9 +250,17 @@ def view_article(article_id: str):
     # similar articles (태그/카테고리 기반)
     similar_candidates = idx.find_related_candidates(article, limit=6)
     similar = [c for c in similar_candidates if c["id"] not in article.related and c["id"] != article_id][:5]
+    temporal = article.extensions.get("temporal", {}) if isinstance(article.extensions, dict) else {}
+    entity_labels = {
+        entity["id"]: entity["name"]
+        for entity in temporal.get("entities", [])
+        if isinstance(entity, dict) and isinstance(entity.get("id"), str)
+        and isinstance(entity.get("name"), str)
+    } if isinstance(temporal, dict) else {}
     return render_template("article.html", article=article,
                            related_map=related_map, quality=quality_report,
-                           backlinks=backlinks, similar=similar)
+                           backlinks=backlinks, similar=similar,
+                           entity_labels=entity_labels)
 @app.route("/category/<path:category_name>")
 def view_category(category_name: str):
     idx = get_index()

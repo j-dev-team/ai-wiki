@@ -1,6 +1,6 @@
 ---
 name: ai-wiki-missions
-version: 1.1.1
+version: 1.1.2
 description: Resume and execute approved AI Wiki Missions through revision-pinned plans, task leases, evidence submission, independent review, and handoff.
 user-invocable: true
 argument-hint: "[research|plan|execute|resume|status|review]"

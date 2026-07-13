@@ -653,6 +653,15 @@ button:hover,
   background: var(--surface-soft);
 }
 
+.timeline-entities {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+}
+
 .dispute-topic,
 .position-claim {
   font-weight: 750;

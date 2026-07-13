@@ -27,6 +27,8 @@ class TemporalEntity(TemporalModel):
     kind: str = Field(min_length=1)
     name: str = Field(min_length=1)
     aliases: list[str] = Field(default_factory=list)
+    attributes: dict[str, str] = Field(default_factory=dict)
+    disclosure_status: str | None = None
     external_ids: dict[str, str] = Field(default_factory=dict)
 
 
@@ -90,6 +92,13 @@ class TemporalClaim(TemporalModel):
         return self
 
 
+class TemporalEventLink(TemporalModel):
+    """An explicit semantic edge between two events in the same narrative."""
+
+    event_id: str = Field(min_length=1)
+    relation: Literal["precedes", "continues", "escalates", "same_subject", "related"]
+
+
 class TemporalEvent(TemporalModel):
     id: str = Field(min_length=1)
     event_type: str = Field(min_length=1)
@@ -99,6 +108,7 @@ class TemporalEvent(TemporalModel):
     participant_ids: list[str] = Field(default_factory=list)
     description: str = Field(min_length=1)
     evidence_ids: list[str] = Field(default_factory=list)
+    event_links: list[TemporalEventLink] = Field(default_factory=list)
 
     @field_validator("occurred_at", "started_at", "ended_at", mode="before")
     @classmethod
@@ -189,6 +199,13 @@ class TemporalExtension(TemporalModel):
                 raise ValueError(f"unknown event participant: {event.id}")
             if set(event.evidence_ids) - evidence_ids:
                 raise ValueError(f"unknown event evidence: {event.id}")
+            linked_ids = [link.event_id for link in event.event_links]
+            if event.id in linked_ids:
+                raise ValueError(f"event cannot link to itself: {event.id}")
+            if len(linked_ids) != len(set(linked_ids)):
+                raise ValueError(f"duplicate event links: {event.id}")
+            if set(linked_ids) - event_ids:
+                raise ValueError(f"unknown linked event: {event.id}")
         claims = {item.id: item for item in self.claims}
         for transition in self.transitions:
             for claim_id in (transition.from_claim_id, transition.to_claim_id):

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.2 - 2026-07-13
+
+- Add entity-first temporal authoring: canonical entity attributes, explicit event-to-event links, and source-backed event participants precede narrative prose.
+- Add the opt-in `timeline_contract: entity_first` validator, which rejects timeline rows not bound to a known event and that event's participant IDs.
+- Render bound timeline entities from their canonical graph names, so a concise narrative label cannot silently split one person into several people.
+- Update AI Wiki skills with the required entity-first write workflow while keeping legacy temporal timelines readable.
+
 ## 1.1.1 - 2026-07-13
 
 - Add compact Mission execution reads for progress, next-task, task-context, and criterion-evidence retrieval while preserving the full immutable ledger.

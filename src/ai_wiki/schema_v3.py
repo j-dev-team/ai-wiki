@@ -40,7 +40,59 @@ class WikiDocumentV3(WikiDocumentV2):
             raise ValueError(f"unknown temporal source IDs referenced: {sorted(unknown)}")
         if self.extensions.get("temporal") is not None:
             raise ValueError("schema v3 temporal data must use top-level fields")
+        # Existing v3 ledgers remain readable. A full entity-first contract
+        # binds every row; partially migrated ledgers still validate every row
+        # that claims an event/entity reference.
+        timeline = self.content.data.get("timeline")
+        if self.content.data.get("timeline_contract") is not None or (
+            isinstance(timeline, list)
+            and any(isinstance(row, dict) and ({"event_id", "entity_ids"} & set(row)) for row in timeline)
+        ):
+            self._validate_narrative_timeline(temporal)
         return self
+
+    def _validate_narrative_timeline(self, temporal: TemporalExtension) -> None:
+        """Bind human-readable timeline rows to the canonical event graph.
+
+        A v3 document may still have free-form content, but once it publishes a
+        ``content.data.timeline`` each row must point at one temporal event and
+        name only that event's participants through stable entity IDs.  This
+        prevents prose from silently splitting one participant into two people.
+        """
+        timeline = self.content.data.get("timeline")
+        contract = self.content.data.get("timeline_contract")
+        if contract not in (None, "entity_first"):
+            raise ValueError("timeline_contract must be 'entity_first'")
+        if timeline is None:
+            return
+        if not isinstance(timeline, list):
+            raise ValueError("content.data.timeline must be a list")
+        events = {event.id: event for event in temporal.events}
+        entities = {entity.id for entity in temporal.entities}
+        for index, row in enumerate(timeline):
+            if not isinstance(row, dict):
+                raise ValueError(f"timeline row {index} must be an object")
+            has_binding = "event_id" in row or "entity_ids" in row
+            if contract is None and not has_binding:
+                continue
+            event_id = row.get("event_id")
+            if not isinstance(event_id, str) or event_id not in events:
+                raise ValueError(f"timeline row {index} requires a known event_id")
+            entity_ids = row.get("entity_ids")
+            if not isinstance(entity_ids, list) or not entity_ids or not all(
+                isinstance(entity_id, str) for entity_id in entity_ids
+            ):
+                raise ValueError(f"timeline row {index} requires non-empty entity_ids")
+            if len(entity_ids) != len(set(entity_ids)):
+                raise ValueError(f"timeline row {index} has duplicate entity_ids")
+            unknown = set(entity_ids) - entities
+            if unknown:
+                raise ValueError(f"timeline row {index} has unknown entities: {sorted(unknown)}")
+            unrelated = set(entity_ids) - set(events[event_id].participant_ids)
+            if unrelated:
+                raise ValueError(
+                    f"timeline row {index} entities are not participants of {event_id}: {sorted(unrelated)}"
+                )
 
 
 def validate_v3_document(data: dict[str, Any]) -> WikiDocumentV3:

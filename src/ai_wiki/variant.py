@@ -399,7 +399,7 @@ def _find_installed_command(command_name: str, python_executable: str | None = N
 def _write_variant_module(target_dir: Path, spec: VariantSpec) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
     runtime_spec = repr(spec.as_dict())
-    (target_dir / "__init__.py").write_text('__version__ = "1.1.1"\n', encoding="utf-8")
+    (target_dir / "__init__.py").write_text('__version__ = "1.1.2"\n', encoding="utf-8")
     (target_dir / "cli.py").write_text(
         "from pathlib import Path\n\n"
         "from ai_wiki.runtime import activate_variant\n\n"
@@ -435,7 +435,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "{spec.package_name}"
-version = "1.1.1"
+version = "1.1.2"
 description = "{_toml_string(spec.description)}"
 readme = "README.md"
 license = "MIT"
@@ -531,7 +531,7 @@ def _render_skill(spec: VariantSpec) -> str:
     )
     return f"""---
 name: {spec.skill_name}
-version: 1.1.1
+version: 1.1.2
 description: {spec.description} Use this skill whenever the request is about {trigger_text} knowledge, research, records, or retrieval in this dedicated domain. {routing_text}
 user-invocable: true
 argument-hint: "[capabilities|context|get|record-use|patch|create] [query or options]"
@@ -584,6 +584,25 @@ a reliable public source published them.
   than irreversible information loss.
 - When anonymization is requested or required, add `content.identity_handling`
   with its reason, scope, source disclosure status, and preserved attributes.
+
+## Entity-First Event Authoring
+
+For a temporal (schema v3) matter, build the canonical graph before prose:
+
+1. Create one `entities[]` record per real-world participant. Put sourced
+   distinguishing attributes in `attributes`; keep a withheld name unknown,
+   rather than creating a second generic person.
+2. Create `events[]` using only `participant_ids`. If events form one sequence,
+   connect them with `event_links` (`continues`, `escalates`, or `same_subject`).
+3. Set `content.data.timeline_contract` to `entity_first`. Every
+   `content.data.timeline[]` row must contain the canonical `event_id` and
+   non-empty `entity_ids`. Those IDs must be participants of that event.
+4. Write the narrative only after the graph exists. Use the canonical entity
+   name or a faithful derived label; never introduce a new person label in a
+   timeline row.
+
+The engine rejects schema-v3 entity-first timeline rows that are not bound to
+a known event and its participant IDs.
 
 ## Routing Priority
 

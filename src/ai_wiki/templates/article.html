@@ -170,6 +170,32 @@
                 {% endfor %}
               </div>
             </section>
+            {% elif key == 'timeline' and value is iterable and value is not string %}
+            <section class="content-section" id="{{ anchor }}">
+              <h2 class="section-key">{{ label(key) }}</h2>
+              <div class="timeline-track">
+                {% for entry in value %}
+                  {% if entry is mapping %}
+                  <div class="timeline-entry">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-content">
+                      <span class="timeline-period">{{ entry.get('date', entry.get('period', '')) }}</span>
+                      <p class="timeline-interp">{{ entry.get('event', entry.get('description', '')) }}</p>
+                      {% if entry.get('entity_ids') %}
+                      <p class="timeline-entities">
+                        <span>{{ '관련 엔터티' if lang == 'ko' else 'Linked entities' }}:</span>
+                        {% for entity_id in entry.get('entity_ids', []) %}
+                        <span class="badge badge-tag" data-entity-id="{{ entity_id }}">{{ entity_labels.get(entity_id, entity_id) }}</span>
+                        {% endfor %}
+                      </p>
+                      {% endif %}
+                      {% if entry.get('status') %}<p class="timeline-note">{{ entry.status }}</p>{% endif %}
+                    </div>
+                  </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </section>
             {% else %}
             <section class="content-section" id="{{ anchor }}">
               <h2 class="section-key">{{ label(key) }}</h2>

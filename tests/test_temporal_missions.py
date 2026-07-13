@@ -78,6 +78,18 @@ def test_temporal_contract_rejects_invalid_references_and_naive_time():
         TemporalExtension.model_validate(raw)
 
 
+def test_temporal_contract_rejects_unknown_or_self_event_links():
+    raw = _temporal_data()
+    raw["events"][0]["event_links"] = [{"event_id": "missing", "relation": "continues"}]
+    with pytest.raises(ValidationError, match="unknown linked event"):
+        TemporalExtension.model_validate(raw)
+
+    raw = _temporal_data()
+    raw["events"][0]["event_links"] = [{"event_id": "event-1", "relation": "same_subject"}]
+    with pytest.raises(ValidationError, match="cannot link to itself"):
+        TemporalExtension.model_validate(raw)
+
+
 def test_temporal_index_and_queries_are_derived_and_rebuild_removes_stale(wiki_root):
     article = Article(
         id="temporal-doc", title="Temporal document", category="technology",
