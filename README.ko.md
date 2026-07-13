@@ -4,7 +4,7 @@ AI Wiki는 AI가 지식을 검색하고 읽고 부분 수정하며 재사용하�
 
 [English README](https://github.com/j-dev-team/ai-wiki/blob/master/README.md)
 
-[AI Wiki 1.1.4 통합 사용설명서](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md) | [목적별 독립 위키 안내](https://github.com/j-dev-team/ai-wiki/blob/master/docs/VARIANTS.md)
+[AI Wiki 1.2.0 통합 사용설명서](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md) | [목적별 독립 위키 안내](https://github.com/j-dev-team/ai-wiki/blob/master/docs/VARIANTS.md)
 
 > 로컬 단독 사용 안내: AI Wiki는 한 명이 PC에서 단독으로 쓰는 것을 기준으로 하며, 계정·로그인·서버 설정이 필요 없습니다. 웹 UI와 데이터 디렉터리를 외부 네트워크에 공개하지 말고, 운영체제 계정과 위키 폴더 접근 권한을 보호하세요. 전체 저장소 암호화는 운영체제의 책임입니다.
 
@@ -19,6 +19,8 @@ AI Wiki는 AI가 지식을 검색하고 읽고 부분 수정하며 재사용하�
 - 로컬 웹 UI: 검색, 문서 조회/작성/수정, 그래프, 대시보드 제공
 - 운영 명령: `doctor`, `lint`, `maintain`, `quality`, `todo`, `gaps`, `stale`, `vindex`
 - Mission 작업 관리: revision 고정 계획, 승인, 작업 lease, 완료 기준별 증거, 독립 검토와 인계
+- Mission Command Center: 다음 작업에 필요한 고정 계획·의존 결과·기준·증거 요약·lease·차단·인계를 작은 응답 하나로 제공하고 전체 원장은 감사용으로 보존
+- Deep Research 스킬: 범위·중단 조건·claim ledger를 먼저 만들고, 명시적 등록 권한이 없으면 읽기 전용으로 조사
 - 시간·엔터티 지식: 사실의 유효 시점과 출처를 보존하고, 사건·참여자·연속 이벤트를 연결
 
 ## 설치
@@ -41,6 +43,10 @@ ai-wiki upgrade-skill
 ai-wiki vindex
 ai-wiki doctor
 ```
+
+1.2.0부터 `upgrade-skill`은 기본·Mission·Deep Research 스킬을 같은 버전으로
+설치합니다. 평소 실행에는 작은 다음 작업 컨텍스트를 사용하고, 전체 Mission 원장은
+검토 또는 감사가 필요할 때만 조회합니다.
 
 설치부터 목적별 위키, 백업, 복원, 문제 해결까지는 [통합 사용설명서](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md)를 참고하세요.
 
@@ -182,6 +188,10 @@ skill 파일을 최신 버전으로 다시 설치하려면:
 ```bash
 ai-wiki upgrade-skill
 ```
+
+심층 조사는 설치된 `ai-wiki-deep-research` 스킬을 사용합니다. 이 스킬은 먼저
+근거 계획과 claim ledger를 만들며, 사용자가 조사 보고서 등록 또는 지속 저장을
+명시적으로 요청한 경우에만 위키에 기록합니다.
 
 ## 개발 및 테스트
 

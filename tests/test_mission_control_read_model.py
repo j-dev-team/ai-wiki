@@ -68,6 +68,22 @@ def test_run_detail_joins_exact_pinned_plan_revision_and_derives_counts(wiki_roo
         assert detail["criterion_counts"]["missing"] == 2
         assert detail["evidence_count"] == 3
         assert detail["handoff_count"] == 1
+        assert detail["control"] == {
+            "run_id": run["id"],
+            "run_revision": 4,
+            "run_status": "running",
+            "pinned_plan_id": plan["id"],
+            "pinned_plan_revision": 1,
+            "approval_status": "pending",
+            "next_task": {
+                "id": "T1", "title": "Build detail", "state": "in_review",
+                "instruction": "Render task content and linked proof.",
+                "reason": "in_review",
+            },
+            "blocked_task_ids": ["T2"],
+            "handoff_present": True,
+            "audit_href": f"/missions/{run['id']}?revision=4",
+        }
     finally:
         store.close()
 

@@ -171,6 +171,8 @@ try {
         'ai_wiki/skill_routing.py',
         'ai_wiki/skill_templates/SKILL.md',
         'ai_wiki/mission_skill_templates/SKILL.md',
+        'ai_wiki/mission_skill_templates/references/mission-examples.ko.md',
+        'ai_wiki/deep_research_skill_templates/SKILL.md',
         'ai_wiki/temporal_contracts.py',
         'ai_wiki/missions.py',
         'ai_wiki/team_security.py',

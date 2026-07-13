@@ -1,6 +1,6 @@
 ---
 name: ai-wiki-missions
-version: 1.1.4
+version: 1.2.0
 description: Resume and execute approved AI Wiki Missions through revision-pinned plans, task leases, evidence submission, independent review, and handoff.
 user-invocable: true
 argument-hint: "[research|plan|execute|resume|status|review]"
@@ -60,6 +60,12 @@ history and evidence bodies; the immutable full ledger remains available with
 
 Never delete autonomously, self-approve a plan, mark your own task completed,
 reuse a stale plan revision, or move knowledge between isolated wiki roots.
+
+## Valid document examples
+
+Read `references/mission-examples.ko.md` before creating a ResearchReport,
+WorkPlan, WorkRun evidence, reviewer decision, or handoff. The examples are
+minimal valid shapes, not a replacement for the approved plan and revision.
 
 ## Language and readability
 

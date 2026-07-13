@@ -534,6 +534,14 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 UI_TRANSLATIONS = {
     "ko": {
         "missions.total": "전체 기록",
+        "missions.command_state": "지금 판단할 실행",
+        "missions.next_task": "다음 작업",
+        "missions.audit_ledger": "전체 감사 기록",
+        "missions.pinned_revision": "고정 계획",
+        "missions.latest_revision": "최신 수정 번호",
+        "missions.no_active_run": "연결된 실행 없음",
+        "missions.view_execution": "실행 기록 열기",
+        "missions.execution_blocked": "차단된 작업",
         "missions.filters": "작업 기록 필터",
         "missions.kind": "종류",
         "missions.status": "상태",
@@ -604,7 +612,11 @@ UI_TRANSLATIONS = {
         "article.pending": "근거 확인 필요",
     },
     "en": {
-        "missions.total": "Total records", "missions.filters": "Mission filters",
+        "missions.total": "Total records", "missions.command_state": "Execution needing attention",
+        "missions.next_task": "Next task", "missions.audit_ledger": "Full audit ledger",
+        "missions.pinned_revision": "Pinned plan", "missions.latest_revision": "Latest revision",
+        "missions.no_active_run": "No linked run", "missions.view_execution": "Open execution record",
+        "missions.execution_blocked": "Blocked tasks", "missions.filters": "Mission filters",
         "missions.kind": "Kind", "missions.status": "Status", "missions.plan": "Linked plan",
         "missions.all_kinds": "All kinds", "missions.all_statuses": "All statuses",
         "missions.apply_filters": "Apply filters", "missions.clear_filters": "Clear filters",
@@ -650,6 +662,10 @@ UI_TRANSLATIONS = {
 
 
 KOREAN_LABELS = {
+    "period": "기간", "date": "날짜", "location": "장소", "participants": "관련 주체",
+    "case_status": "사건 상태", "charges": "혐의", "source_ids": "출처 ID",
+    "legal_issues": "법적 쟁점", "consequences": "결과", "identity_handling": "식별 정보 처리",
+    "public_entity_context": "공개 정보 맥락", "update_triggers": "갱신 조건",
     "facts": "핵심 사실", "mission": "목적", "design_principles": "설계 원칙",
     "architecture": "시스템 구조", "ai_workflow": "AI 작업 순서",
     "protocol_contract": "통신 규칙", "retrieval_pipeline": "검색 과정",

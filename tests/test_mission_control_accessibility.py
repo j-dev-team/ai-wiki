@@ -71,10 +71,11 @@ def test_mobile_task_accordions_and_evidence_drawers_are_named(wiki_root):
     _, detail = _pages(wiki_root)
     parser = OutlineParser()
     parser.feed(detail)
-    # Three task disclosures plus three evidence drawers in the representative run.
-    assert parser.details == parser.summaries == 6
+    # Three task disclosures, three evidence drawers, and a collapsed audit ledger.
+    assert parser.details == parser.summaries == 7
     assert detail.count("Expand or collapse task content") == 3
     assert 'aria-labelledby="evidence-title-E-file"' in detail
+    assert "Full audit ledger" in detail
 
 
 def test_statuses_have_visible_text_and_proof_rail_is_semantic(wiki_root):

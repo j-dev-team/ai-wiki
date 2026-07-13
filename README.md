@@ -38,6 +38,8 @@ AI coding agents (Claude Code, Gemini via Antigravity CLI, GPT Codex) have no bu
 - **Safe Lifecycle** — Backup, restore, migration, upgrade rollback, uninstall, isolation audit, and skill routing audit
 - **Temporal Evidence Ledger** — Reconstruct current, historical, and previously known claims without overwriting history
 - **AI Wiki Missions** — Revision-pinned plans, task leases, evidence review, pause/resume, and Codex/Gemini handoff
+- **Compact Mission Command Center** — One small next-task read carries the pinned plan, dependencies, criteria, evidence summary, lease, blockers, and handoff; the full ledger remains available for audit
+- **Deep Research Skill** — Evidence-led, claim-led research with explicit scope and stop conditions; it is read-only unless durable research registration is requested
 - **Retrieval Trust Loop** — Independently labeled calibration candidates with holdout gates and rollback
 - **Read-Only Connectors** — Git, web, Google Drive, Notion, and Slack snapshots with provenance and permissions
 
@@ -63,6 +65,10 @@ ai-wiki reindex
 ai-wiki vindex
 ai-wiki doctor
 ```
+
+Version 1.2.0 upgrades the primary, Mission, and Deep Research skill set together.
+The installer retains the full Mission audit ledger while making normal agent reads
+compact and action-oriented.
 
 ## AI Agent Workflow
 
@@ -95,6 +101,11 @@ Mission work uses the separate `ai-wiki-missions` skill. AI Wiki stores the
 approved plan, run, lease, evidence, review, and handoff; Codex or Gemini does
 the actual file, command, browser, and research work. See
 [`docs/MISSIONS.md`](docs/MISSIONS.md).
+
+For deep research, use the installed `ai-wiki-deep-research` skill. It begins
+with an evidence plan and claim ledger, treats external verification as
+time-bounded, and does not create durable wiki records unless the user asks for
+a ResearchReport or authorizes writeback.
 
 ### Developer Installation (source)
 

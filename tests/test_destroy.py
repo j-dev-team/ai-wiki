@@ -7,6 +7,7 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
+import ai_wiki.cli as cli_module
 from ai_wiki.cli import cli
 from ai_wiki.index import WikiIndex
 
@@ -219,20 +220,23 @@ def test_init_creates_wiki_structure(tmp_path):
     assert not (tmp_path / "articles").exists()
 
 
-def test_init_creates_skill_dirs(tmp_path):
+def test_init_creates_skill_dirs(tmp_path, monkeypatch):
     '''init creates skill dirs for selected agents.
 
     Selects all 3 agents (1,2,3) to test all skill dirs are created.
     Only created when skill_templates directory has .md files.
     Cleanup skill dirs after test.
     '''
-    import shutil as _shutil
-
-    wiki_name = tmp_path.name
-    claude_skill_dir = Path.home() / ".claude" / "skills" / wiki_name
-    gemini_skill_dir = Path.home() / ".gemini" / "config" / "skills" / wiki_name
-    gemini_compat_skill_dir = Path.home() / ".agents" / "skills" / wiki_name
-    codex_skill_dir = Path.home() / ".codex" / "skills" / wiki_name
+    fake_skills = tmp_path / "agent-skills"
+    wiki_name = "ai-wiki"
+    monkeypatch.setitem(cli_module._AGENT_SKILL_PATHS, "claude", lambda name: fake_skills / "claude" / name)
+    monkeypatch.setitem(cli_module._AGENT_SKILL_PATHS, "gemini", lambda name: fake_skills / "gemini" / name)
+    monkeypatch.setitem(cli_module._AGENT_SKILL_PATHS, "codex", lambda name: fake_skills / "codex" / name)
+    monkeypatch.setitem(cli_module._LEGACY_AGENT_SKILL_PATHS, "gemini", (lambda name: fake_skills / "agents" / name,))
+    claude_skill_dir = fake_skills / "claude" / wiki_name
+    gemini_skill_dir = fake_skills / "gemini" / wiki_name
+    gemini_compat_skill_dir = fake_skills / "agents" / wiki_name
+    codex_skill_dir = fake_skills / "codex" / wiki_name
 
     assert not claude_skill_dir.exists(), f"{claude_skill_dir} should not exist before test"
     assert not gemini_skill_dir.exists(), f"{gemini_skill_dir} should not exist before test"
@@ -258,9 +262,7 @@ def test_init_creates_skill_dirs(tmp_path):
             assert (gemini_skill_dir / "SKILL.md").read_bytes() == (gemini_compat_skill_dir / "SKILL.md").read_bytes()
             assert codex_skill_dir.exists(), f"codex skill dir should be created: {codex_skill_dir}"
     finally:
-        for d in (claude_skill_dir, gemini_skill_dir, gemini_compat_skill_dir, codex_skill_dir):
-            if d.exists():
-                _shutil.rmtree(d)
+        pass
 def test_init_already_initialized(tmp_path):
     """이미 초기화된 위키에 init 재실행 시 already_initialized 반환."""
     _make_wiki_with_config(tmp_path, name="existing", env_var="EXISTING_ROOT")

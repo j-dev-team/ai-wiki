@@ -44,6 +44,9 @@ pyproject.toml
 src/ai_wiki/__init__.py
 src/ai_wiki/variant.py
 src/ai_wiki/templates/base.html
+src/ai_wiki/skill_templates/SKILL.md
+src/ai_wiki/mission_skill_templates/SKILL.md
+src/ai_wiki/deep_research_skill_templates/SKILL.md
 ```
 
 `variant.py`에는 생성되는 목적별 패키지의 버전과 공용 엔진 의존 범위가 있습니다. 예를 들어 `0.3.0` 릴리스는 다음 범위를 사용합니다.
@@ -70,6 +73,7 @@ dependencies = ["ai-wiki>=0.3,<0.4"]
 - `docs/USER_GUIDE.ko.md`: 전체 사용설명서
 - `docs/VARIANTS.md`: 목적별 위키 설치와 수명주기
 - `CHANGELOG.md`: 버전 변경 기록
+- 자기참조 문서: 새 엔진 기능과 설치 스킬의 실제 동작
 
 문서의 설치·업그레이드 명령은 실제 CLI `--help`와 대조합니다.
 
@@ -113,6 +117,10 @@ git commit -m "release: ai-wiki X.Y.Z"
 9. `twine check`
 10. 필수 wheel 리소스 검사
 11. SHA-256 출력 및 `release-dist` 복사
+
+필수 wheel 리소스에는 기본 스킬, Mission 스킬과 예시, Deep Research 스킬도
+포함됩니다. 누락되면 설치는 성공해도 새 위키나 기존 위키가 불완전한 스킬을 받게
+되므로 게시 전에 반드시 수정합니다.
 
 실패한 단계가 있으면 게시하지 않고 원인을 수정한 뒤 새 커밋에서 다시 실행합니다.
 
@@ -173,6 +181,10 @@ ai-wiki upgrade-skill
 ai-wiki vindex
 ai-wiki doctor
 ```
+
+업그레이드 후 `ai-wiki skill audit`으로 기본·Mission·Deep Research 스킬이 같은
+버전인지와 중복 설치본이 없는지를 확인합니다. 과거 별칭이 남아 있으면 해당 위키의
+`upgrade-skill` 또는 variant 업그레이드를 실행해 현재 스킬 이름으로 정리합니다.
 
 목적별 위키는 공용 엔진 업그레이드 후 패키지별 갱신을 실행합니다.
 

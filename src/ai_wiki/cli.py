@@ -47,6 +47,32 @@ SKILL_NAME = _RUNTIME.skill_name
 def _skill_templates_dir() -> Path:
     return _RUNTIME.skill_template_dir or Path(__file__).parent / "skill_templates"
 
+
+def _mission_skill_templates_dir() -> Path:
+    """Use the variant-local Mission template when a variant activated one."""
+    local = _skill_templates_dir().parent / "mission_skill_templates"
+    return local if local.exists() else Path(__file__).parent / "mission_skill_templates"
+
+
+def _deep_research_skill_templates_dir() -> Path:
+    local = _skill_templates_dir().parent / "deep_research_skill_templates"
+    return local if local.exists() else Path(__file__).parent / "deep_research_skill_templates"
+
+
+def _install_deep_research_skill(destination: Path, *, skill_name: str) -> None:
+    templates = _deep_research_skill_templates_dir()
+    if not templates.exists():
+        return
+    destination.mkdir(parents=True, exist_ok=True)
+    for source in templates.rglob("*.md"):
+        target = destination / source.relative_to(templates)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        text = source.read_text(encoding="utf-8").replace("__SKILL_NAME__", skill_name)
+        text = text.replace("__DISPLAY_NAME__", DISPLAY_NAME)
+        text = text.replace("__COMMAND_NAME__", COMMAND_NAME)
+        text = text.replace("__ROOT_ENV_NAME__", ROOT_ENV_NAME)
+        target.write_text(text, encoding="utf-8")
+
 # ── i18n message table ────────────────────────────────────
 
 MESSAGES: dict[str, dict[str, str]] = {
@@ -207,6 +233,42 @@ def _get_installed_skill_version() -> "str | None":
             return _get_skill_version(candidate)
     return None
 
+
+def _skill_file_integrity(template: Path, installed: Path) -> dict:
+    """Return a non-destructive post-copy verification record."""
+    import hashlib
+
+    expected_hash = hashlib.sha256(template.read_bytes()).hexdigest()
+    actual_hash = hashlib.sha256(installed.read_bytes()).hexdigest() if installed.exists() else None
+    return {
+        "path": str(installed),
+        "exists": installed.exists(),
+        "expected_sha256": expected_hash,
+        "actual_sha256": actual_hash,
+        "matches": actual_hash == expected_hash,
+        "expected_version": _get_skill_version(template),
+        "actual_version": _get_skill_version(installed) if installed.exists() else None,
+    }
+
+
+def _active_wiki_processes() -> list[dict[str, str]]:
+    """Best-effort Windows lock diagnostic; never terminates a process."""
+    if os.name != "nt":
+        return []
+    try:
+        completed = subprocess.run(
+            ["tasklist", "/fi", "imagename eq ai-wiki.exe", "/fo", "csv", "/nh"],
+            text=True, capture_output=True, check=False,
+        )
+        rows = []
+        for line in (completed.stdout or "").splitlines():
+            parts = [part.strip().strip('"') for part in line.split('","')]
+            if len(parts) >= 2 and parts[0].casefold() == "ai-wiki.exe":
+                rows.append({"image": parts[0], "pid": parts[1], "next_action": "stop the local server normally, then retry upgrade"})
+        return rows
+    except Exception:
+        return []
+
 def _check_skill_update() -> None:
     """Print an update notice to stderr if package skill version differs from installed version."""
     try:
@@ -274,33 +336,43 @@ def _prompt_agent_selection() -> "list[str]":
     return selected
 
 
-def _install_skills_for_agents(agents: "list[str]", wiki_name: str, skill_files: list) -> "list[str]":
+def _install_skills_for_agents(agents: "list[str]", skill_name: str, skill_files: list) -> "list[str]":
     """Install skill files to the skill paths for the given agents. Returns a list of installed directories."""
     installed_dirs: list[str] = []
     for agent in agents:
         path_fn = _AGENT_SKILL_PATHS.get(agent)
         if path_fn is None:
             continue
-        destinations = [path_fn(wiki_name)]
+        destinations = [path_fn(skill_name)]
         if agent == "gemini":
-            destinations.append(_LEGACY_AGENT_SKILL_PATHS["gemini"][0](wiki_name))
+            destinations.append(_LEGACY_AGENT_SKILL_PATHS["gemini"][0](skill_name))
         for skill_dir in destinations:
             skill_dir.mkdir(parents=True, exist_ok=True)
             for src in skill_files:
                 shutil.copy2(src, skill_dir / src.name)
             installed_dirs.append(str(skill_dir))
-        mission_templates = Path(__file__).parent / "mission_skill_templates"
+        mission_templates = _mission_skill_templates_dir()
         if mission_templates.exists():
-            mission_destinations = [path_fn(f"{wiki_name}-missions")]
+            mission_destinations = [path_fn(f"{skill_name}-missions")]
             if agent == "gemini":
                 mission_destinations.append(
-                    _LEGACY_AGENT_SKILL_PATHS["gemini"][0](f"{wiki_name}-missions")
+                    _LEGACY_AGENT_SKILL_PATHS["gemini"][0](f"{skill_name}-missions")
                 )
             for mission_dir in mission_destinations:
                 mission_dir.mkdir(parents=True, exist_ok=True)
-                for src in mission_templates.glob("*.md"):
-                    shutil.copy2(src, mission_dir / src.name)
+                for src in mission_templates.rglob("*.md"):
+                    destination = mission_dir / src.relative_to(mission_templates)
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src, destination)
                 installed_dirs.append(str(mission_dir))
+        research_destinations = [path_fn(f"{skill_name}-deep-research")]
+        if agent == "gemini":
+            research_destinations.append(
+                _LEGACY_AGENT_SKILL_PATHS["gemini"][0](f"{skill_name}-deep-research")
+            )
+        for research_dir in research_destinations:
+            _install_deep_research_skill(research_dir, skill_name=skill_name)
+            installed_dirs.append(str(research_dir))
     return installed_dirs
 
 
@@ -515,7 +587,7 @@ def init(ctx, path):
 
     installed_skill_dirs: list[str] = []
     if _skill_files:
-        installed_skill_dirs = _install_skills_for_agents(agents, wiki_root.name, _skill_files)
+        installed_skill_dirs = _install_skills_for_agents(agents, SKILL_NAME, _skill_files)
 
     # Generate seed document for this wiki
     _seed_generated = _create_seed_document(wiki_root, lang)
@@ -4158,19 +4230,12 @@ def upgrade_skill(requested_agents):
         click.echo(msg("upgrade_skill_no_files"), err=True)
         sys.exit(1)
 
-    # Read wiki name and agents from .ai-wiki.yaml
+    # The runtime skill identifier, not a user-editable wiki name, is the
+    # canonical installation directory. This prevents hyphen/underscore and
+    # renamed-root duplicates during an upgrade.
     wiki_root_env = _os.environ.get(ROOT_ENV_NAME, _os.environ.get("AI_WIKI_ROOT", "."))
     wiki_root = Path(wiki_root_env).resolve()
     wiki_name = SKILL_NAME
-    _cfg_path = wiki_root / CONFIG_FILENAME
-    if _cfg_path.exists():
-        try:
-            import yaml as _yaml
-            with open(_cfg_path, "r", encoding="utf-8") as _f:
-                _cfg = _yaml.safe_load(_f)
-            wiki_name = _cfg.get("name") or wiki_name
-        except Exception:
-            pass
     agents = list(dict.fromkeys(requested_agents)) or _load_agents_from_config(wiki_root)
 
     # Version check
@@ -4208,7 +4273,7 @@ def upgrade_skill(requested_agents):
             click.echo(msg("upgrade_skill_copied", len(copied), dest_dir, label))
             for fname in sorted(copied):
                 click.echo(msg("upgrade_skill_file_ok", fname))
-        mission_templates = Path(__file__).parent / "mission_skill_templates"
+        mission_templates = _mission_skill_templates_dir()
         if mission_templates.exists():
             mission_destinations = [path_fn(f"{wiki_name}-missions")]
             if agent == "gemini":
@@ -4218,13 +4283,44 @@ def upgrade_skill(requested_agents):
             for mission_dir in mission_destinations:
                 mission_dir.mkdir(parents=True, exist_ok=True)
                 copied = []
-                for src in mission_templates.glob("*.md"):
-                    shutil.copy2(src, mission_dir / src.name)
-                    copied.append(src.name)
+                for src in mission_templates.rglob("*.md"):
+                    destination = mission_dir / src.relative_to(mission_templates)
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src, destination)
+                    copied.append(str(src.relative_to(mission_templates)))
                 label = _AGENT_DISPLAY.get(agent, agent)
                 click.echo(msg("upgrade_skill_copied", len(copied), mission_dir, label))
                 for fname in sorted(copied):
                     click.echo(msg("upgrade_skill_file_ok", fname))
+        research_destinations = [path_fn(f"{wiki_name}-deep-research")]
+        if agent == "gemini":
+            research_destinations.append(
+                _LEGACY_AGENT_SKILL_PATHS["gemini"][0](f"{wiki_name}-deep-research")
+            )
+        for research_dir in research_destinations:
+            _install_deep_research_skill(research_dir, skill_name=wiki_name)
+            click.echo(msg("upgrade_skill_copied", 1, research_dir, _AGENT_DISPLAY.get(agent, agent)))
+            click.echo(msg("upgrade_skill_file_ok", "SKILL.md"))
+
+    # A successful copy is not enough: expose deterministic version/hash
+    # evidence, but never terminate a possibly active local server for users.
+    verification = []
+    for agent in agents:
+        path_fn = _AGENT_SKILL_PATHS.get(agent)
+        if path_fn is not None:
+            verification.append(
+                _skill_file_integrity(templates_dir / "SKILL.md", path_fn(wiki_name) / "SKILL.md")
+            )
+    failed = [item for item in verification if not item["matches"]]
+    click.echo(json.dumps({
+        "skill_upgrade_verification": verification,
+        "process_policy": "no_process_is_terminated_automatically",
+        "active_ai_wiki_processes": _active_wiki_processes(),
+    }, ensure_ascii=False))
+    if failed:
+        raise click.ClickException(
+            "skill upgrade verification failed; inspect the reported path, hash, version, and file lock"
+        )
 
     version_str = pkg_ver or "unknown"
     click.echo(msg("upgrade_skill_done", version_str))

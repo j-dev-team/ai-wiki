@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0 - 2026-07-13
+
+- Add Mission Control's compact command-center projections: agents can retrieve the next actionable task with its pinned plan, dependencies, criteria, evidence summary, lease, blocker, and handoff state without loading the full audit ledger.
+- Make Mission Control's plan, task, criterion, evidence, and handoff views responsive and language-aware in Korean and English.
+- Add the installed `ai-wiki-deep-research` skill: evidence-led, claim-ledger research is read-only by default and only writes a ResearchReport when explicitly authorized.
+- Package the shared skill references, Mission examples, and Deep Research template in wheels and generated purpose-specific variants.
+- Harden skill installation and audit rules so primary, Mission, and Deep Research skills are versioned and checked as one set.
+- Refresh self-reference, README, user guide, and release guidance for the 1.2.0 local single-user workflow.
+
 ## 1.1.4 - 2026-07-13
 
 - Make the README, user guide, and Mission guide consistently describe AI Wiki as a local single-user tool; remove team-mode setup and login-oriented guidance from current documentation.
