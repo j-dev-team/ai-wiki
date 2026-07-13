@@ -949,6 +949,18 @@ class MissionControlReader:
                         "revision": representative["revision"],
                         "status": representative["status"],
                     }
+                    try:
+                        run_document = self.store.get(
+                            representative["id"], representative["revision"],
+                        )
+                        plan_document = self.store.get(row["id"], row["revision"])
+                        if run_document is not None and plan_document is not None:
+                            summary["control"] = self._execution_summary(
+                                run_document,
+                                WorkPlanPayload.model_validate(plan_document.payload),
+                            )
+                    except Exception:
+                        summary["control"] = {"degraded": True}
             source_objective = summary.get("objective", "")
             localized = summary.get("objective_localizations") or {}
             language = self._language_state(
@@ -999,6 +1011,7 @@ class MissionControlReader:
             "history": [item.model_dump(mode="json") for item in document.history],
             "execution_events": [],
             "review_decisions": [],
+            "control": None,
             "payload": deepcopy(document.payload),
             "language": self._language_state(
                 document.metadata.source_language,
@@ -1210,6 +1223,53 @@ class MissionControlReader:
         criterion_counts["missing"] = criterion_counts.get("missing", 0)
         return dict(task_counts), dict(criterion_counts)
 
+    def _execution_summary(
+        self, run_document: MissionDocument, plan: WorkPlanPayload,
+    ) -> dict[str, Any]:
+        """Return the smallest complete execution state for an agent decision UI."""
+        run = WorkRunPayload.model_validate(run_document.payload)
+        states = {state.task_id: state for state in run.task_states}
+        completed = {
+            task_id for task_id, state in states.items() if state.status == "completed"
+        }
+        next_task = None
+        for task in plan.tasks:
+            state = states.get(task.id)
+            if state and state.status == "in_progress":
+                next_task = {"id": task.id, "title": task.title, "state": state.status,
+                             "instruction": task.instructions, "reason": "in_progress"}
+                break
+        if next_task is None:
+            for task in plan.tasks:
+                state = states.get(task.id)
+                if state and state.status == "in_review":
+                    next_task = {"id": task.id, "title": task.title, "state": state.status,
+                                 "instruction": task.instructions, "reason": "in_review"}
+                    break
+        if next_task is None:
+            for task in plan.tasks:
+                state = states.get(task.id)
+                status = state.status if state else "planned"
+                if status in {"planned", "ready"} and all(
+                    dependency in completed for dependency in task.dependencies
+                ):
+                    next_task = {"id": task.id, "title": task.title, "state": status,
+                                 "instruction": task.instructions, "reason": "ready"}
+                    break
+        blocked = [state.task_id for state in run.task_states if state.status == "blocked"]
+        return {
+            "run_id": run.run_id,
+            "run_revision": run_document.revision,
+            "run_status": run_document.status,
+            "pinned_plan_id": run.plan_id,
+            "pinned_plan_revision": run.plan_revision,
+            "approval_status": plan.approval.status,
+            "next_task": next_task,
+            "blocked_task_ids": blocked,
+            "handoff_present": bool(run.handoff),
+            "audit_href": f"/missions/{run.run_id}?revision={run_document.revision}",
+        }
+
     def _add_plan_detail(self, detail: dict[str, Any], document: MissionDocument) -> None:
         plan = WorkPlanPayload.model_validate(document.payload)
         tasks = self._plan_tasks(plan)
@@ -1246,6 +1306,7 @@ class MissionControlReader:
                         "status": run_document.status,
                         "plan_revision": run.plan_revision,
                     }
+                    detail["control"] = self._execution_summary(run_document, plan)
             except Exception as exc:
                 detail["degraded"].append({
                     "code": "representative_run_unavailable",
@@ -1499,6 +1560,7 @@ class MissionControlReader:
         detail["task_counts"], detail["criterion_counts"] = self._counts(
             tasks, global_criteria,
         )
+        detail["control"] = self._execution_summary(document, plan)
         self._localize_plan_detail(detail, pinned)
         detail["run_language"] = detail["language"]
         detail["language"] = detail["plan_language"]

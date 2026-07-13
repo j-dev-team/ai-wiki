@@ -30,7 +30,7 @@
     <dl class="nested-dict nested-depth-{{ [depth, 3]|min }}">
       {% for k, v in value.items() %}
       <div class="kv-pair">
-        <dt class="kv-key">{{ label(k) }}</dt>
+        <dt class="kv-key">{{ label(k) }}{% if label(k) != k %}<small class="field-key" aria-label="original field key">{{ k }}</small>{% endif %}</dt>
         <dd class="kv-value">{{ render_value(v, depth + 1) }}</dd>
       </div>
       {% endfor %}
@@ -123,7 +123,7 @@
             {% set anchor = 'section-' ~ key|replace('_', '-') %}
             {% if key == 'disputes' and value is iterable and value is not string %}
             <section class="content-section" id="{{ anchor }}">
-              <h2 class="section-key">{{ label(key) }}</h2>
+              <h2 class="section-key">{{ label(key) }}{% if label(key) != key %}<small class="field-key">{{ key }}</small>{% endif %}</h2>
               {% for dispute in value %}
                 {% if dispute is mapping %}
                 <div class="dispute-card">
@@ -152,7 +152,7 @@
             </section>
             {% elif key == 'historiography' and value is iterable and value is not string %}
             <section class="content-section" id="{{ anchor }}">
-              <h2 class="section-key">{{ label(key) }}</h2>
+              <h2 class="section-key">{{ label(key) }}{% if label(key) != key %}<small class="field-key">{{ key }}</small>{% endif %}</h2>
               <div class="timeline-track">
                 {% for entry in value %}
                   {% if entry is mapping %}
@@ -172,7 +172,7 @@
             </section>
             {% elif key == 'timeline' and value is iterable and value is not string %}
             <section class="content-section" id="{{ anchor }}">
-              <h2 class="section-key">{{ label(key) }}</h2>
+              <h2 class="section-key">{{ label(key) }}{% if label(key) != key %}<small class="field-key">{{ key }}</small>{% endif %}</h2>
               <div class="timeline-track">
                 {% for entry in value %}
                   {% if entry is mapping %}
@@ -198,7 +198,7 @@
             </section>
             {% else %}
             <section class="content-section" id="{{ anchor }}">
-              <h2 class="section-key">{{ label(key) }}</h2>
+              <h2 class="section-key">{{ label(key) }}{% if label(key) != key %}<small class="field-key">{{ key }}</small>{% endif %}</h2>
               <div class="section-value">{{ render_value(value) }}</div>
             </section>
             {% endif %}

@@ -2,7 +2,9 @@
 
 Purpose-specific wikis isolate data, commands, configuration, vector databases, web ports, and AI agent skills while sharing the `ai-wiki` engine.
 
-For a complete Korean walkthrough, see the [AI Wiki 1.1.4 User Guide](USER_GUIDE.ko.md).
+For a complete Korean walkthrough, see the [AI Wiki 1.2.0 User Guide](USER_GUIDE.ko.md).
+For canonical skill names, historical alias cleanup, and isolated Mission roots,
+see the Korean [Skill Identity Contract](SKILL_IDENTITY_CONTRACT.ko.md).
 
 ## Install
 

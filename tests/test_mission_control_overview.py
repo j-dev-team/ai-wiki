@@ -37,7 +37,7 @@ def test_overview_is_a_semantic_queue_with_exact_revision_links(wiki_root):
     assert '<ol class="mission-queue">' in html
     assert html.count('<article class="mission-queue-item') == 1
     assert f'/missions/{plan["id"]}?revision=1&amp;lang=en' in html
-    assert f'/missions/{run["id"]}?revision=4&amp;lang=en' not in html
+    assert f'/missions/{run["id"]}?revision=4&amp;lang=en' in html
     assert "Linked runs" in html
     assert "Blocked" in html and "In review" in html
     assert "Criteria with proof" in html and "Handoff" in html
@@ -45,6 +45,9 @@ def test_overview_is_a_semantic_queue_with_exact_revision_links(wiki_root):
     assert "2 / 5" in html
     assert ">3</dd>" in html
     assert "Recorded" in html
+    assert "Execution needing attention" in html
+    assert "Next task" in html
+    assert "Open execution record" in html
     assert "C:/private/workspace/command.log" not in html
     assert "token=secret" not in html
     assert "Detail is ready for review" not in html

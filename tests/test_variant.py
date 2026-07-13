@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 from click.testing import CliRunner
 
-from ai_wiki.cli import cli
+from ai_wiki.cli import _active_wiki_processes, _skill_file_integrity, cli
 from ai_wiki.variant import VariantSpec, create_variant_package, install_variant_package, list_builtin_presets, load_builtin_preset
 
 
@@ -73,7 +73,7 @@ def test_variant_create_generates_independent_package(tmp_path):
     assert 'name = "law-wiki"' in pyproject
     assert 'law-wiki = "law_wiki.cli:cli"' in pyproject
     assert 'law-wiki-web = "law_wiki.web:main"' in pyproject
-    assert 'dependencies = ["ai-wiki>=1.1,<1.2"]' in pyproject
+    assert 'dependencies = ["ai-wiki>=1.2,<1.3"]' in pyproject
     assert '"variant.yaml"' in pyproject
 
     cli_text = (package_dir / "src" / "law_wiki" / "cli.py").read_text(encoding="utf-8")
@@ -92,8 +92,21 @@ def test_variant_create_generates_independent_package(tmp_path):
     assert "content.identity_handling" in skill_text
     assert "Entity-First Event Authoring" in skill_text
     assert "timeline_contract" in skill_text
-    assert "version: 1.1.4" in skill_text
+    assert "references/domain-checklist.ko.md" in skill_text
+    assert "version: 1.2.0" in skill_text
     assert (package_dir / "src" / "law_wiki" / "variant.yaml").exists()
+    mission_text = (package_dir / "src" / "law_wiki" / "mission_skill_templates" / "SKILL.md").read_text(encoding="utf-8")
+    assert "name: law-wiki-missions" in mission_text
+    assert "law-wiki run next" in mission_text
+    assert "ai-wiki run next" not in mission_text
+    assert (package_dir / "src" / "law_wiki" / "mission_skill_templates" / "references" / "mission-examples.ko.md").exists()
+    research_skill = (package_dir / "src" / "law_wiki" / "deep_research_skill_templates" / "SKILL.md").read_text(encoding="utf-8")
+    assert "name: law-wiki-deep-research" in research_skill
+    assert "law-wiki` with `LAW_WIKI_ROOT`" in research_skill
+    assert "supported/contested/insufficient/out_of_scope" in research_skill
+    domain_reference = (package_dir / "src" / "law_wiki" / "skill_templates" / "references" / "domain-checklist.ko.md").read_text(encoding="utf-8")
+    assert "관할" in domain_reference
+    assert "비공개 데이터" in domain_reference
 
     manifest = yaml.safe_load((package_dir / "variant.yaml").read_text(encoding="utf-8"))
     assert manifest["package_name"] == "law-wiki"
@@ -325,3 +338,34 @@ def test_variant_install_cli_orchestrates_full_provision(tmp_path, monkeypatch):
     assert captured["spec"].domain == "law"
     assert captured["agents"] == ("codex",)
     assert captured["lang"] == "ko"
+
+
+def test_skill_upgrade_integrity_reports_version_hash_and_tampering(tmp_path):
+    template = tmp_path / "template.md"
+    installed = tmp_path / "installed.md"
+    template.write_text("---\nversion: 1.2.0\n---\ncontent", encoding="utf-8")
+    installed.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
+
+    ok = _skill_file_integrity(template, installed)
+    assert ok["matches"] is True
+    assert ok["expected_version"] == "1.2.0"
+
+    installed.write_text("---\nversion: 0.0.1\n---\ntampered", encoding="utf-8")
+    failed = _skill_file_integrity(template, installed)
+    assert failed["matches"] is False
+    assert failed["actual_version"] == "0.0.1"
+
+
+def test_windows_process_diagnostic_reports_pid_without_terminating(monkeypatch):
+    import os
+    import ai_wiki.cli as cli_module
+
+    monkeypatch.setattr(os, "name", "nt", raising=False)
+    monkeypatch.setattr(
+        cli_module.subprocess, "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, '"ai-wiki.exe","4321","Console","1","10,000 K"\n', ""),
+    )
+    assert _active_wiki_processes() == [{
+        "image": "ai-wiki.exe", "pid": "4321",
+        "next_action": "stop the local server normally, then retry upgrade",
+    }]

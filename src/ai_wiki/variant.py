@@ -27,6 +27,7 @@ class VariantSpec:
     domain: str
     command_name: str
     skill_name: str
+    skill_aliases: tuple[str, ...]
     env_prefix: str
     config_filename: str
     web_port: int
@@ -43,6 +44,7 @@ class VariantSpec:
         domain: str | None = None,
         command_name: str | None = None,
         skill_name: str | None = None,
+        skill_aliases: list[str] | tuple[str, ...] | None = None,
         env_prefix: str | None = None,
         config_filename: str | None = None,
         web_port: int | None = None,
@@ -63,6 +65,10 @@ class VariantSpec:
             or f"{display_name} knowledge wiki. Stores and searches structured YAML documents through the {command_name} CLI."
         ).strip()
         normalized_triggers = tuple(t.strip() for t in (triggers or ()) if t.strip())
+        normalized_aliases = tuple(
+            alias.strip() for alias in (skill_aliases or ())
+            if alias.strip() and alias.strip() != skill_name
+        )
 
         spec = cls(
             package_name=package_name,
@@ -71,6 +77,7 @@ class VariantSpec:
             domain=domain,
             command_name=command_name,
             skill_name=skill_name,
+            skill_aliases=normalized_aliases,
             env_prefix=env_prefix,
             config_filename=config_filename,
             web_port=web_port,
@@ -91,6 +98,7 @@ class VariantSpec:
         domain: str | None = None,
         command_name: str | None = None,
         skill_name: str | None = None,
+        skill_aliases: list[str] | tuple[str, ...] | None = None,
         env_prefix: str | None = None,
         config_filename: str | None = None,
         web_port: int | None = None,
@@ -108,6 +116,7 @@ class VariantSpec:
             "domain": domain,
             "command_name": command_name,
             "skill_name": skill_name,
+            "skill_aliases": skill_aliases,
             "env_prefix": env_prefix,
             "config_filename": config_filename,
             "web_port": web_port,
@@ -129,6 +138,7 @@ class VariantSpec:
             domain=merged.get("domain"),
             command_name=merged.get("command_name"),
             skill_name=merged.get("skill_name"),
+            skill_aliases=merged.get("skill_aliases") or (),
             env_prefix=merged.get("env_prefix"),
             config_filename=merged.get("config_filename"),
             web_port=merged.get("web_port"),
@@ -168,6 +178,12 @@ class VariantSpec:
             raise ValueError("module_name must be a valid Python package identifier")
         if not _COMMAND_RE.match(self.command_name):
             raise ValueError("command_name must use lowercase letters, numbers, and hyphens")
+        if not _COMMAND_RE.match(self.skill_name):
+            raise ValueError("skill_name must use lowercase letters, numbers, and hyphens")
+        if len(set(self.skill_aliases)) != len(self.skill_aliases):
+            raise ValueError("skill_aliases must be unique")
+        if any(not re.match(r"^[a-z0-9][a-z0-9_-]*[a-z0-9]$", alias) for alias in self.skill_aliases):
+            raise ValueError("skill_aliases must use lowercase letters, numbers, hyphens, and underscores")
         if not self.config_filename.startswith(".") or not self.config_filename.endswith(".yaml"):
             raise ValueError("config_filename must look like .name.yaml")
         if not self.env_prefix.replace("_", "").isalnum() or self.env_prefix.upper() != self.env_prefix:
@@ -183,6 +199,7 @@ class VariantSpec:
             "domain": self.domain,
             "command_name": self.command_name,
             "skill_name": self.skill_name,
+            "skill_aliases": list(self.skill_aliases),
             "env_prefix": self.env_prefix,
             "config_filename": self.config_filename,
             "web_port": self.web_port,
@@ -399,7 +416,7 @@ def _find_installed_command(command_name: str, python_executable: str | None = N
 def _write_variant_module(target_dir: Path, spec: VariantSpec) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
     runtime_spec = repr(spec.as_dict())
-    (target_dir / "__init__.py").write_text('__version__ = "1.1.4"\n', encoding="utf-8")
+    (target_dir / "__init__.py").write_text('__version__ = "1.2.0"\n', encoding="utf-8")
     (target_dir / "cli.py").write_text(
         "from pathlib import Path\n\n"
         "from ai_wiki.runtime import activate_variant\n\n"
@@ -425,6 +442,18 @@ def _write_variant_module(target_dir: Path, spec: VariantSpec) -> None:
     skill_dir = target_dir / "skill_templates"
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "SKILL.md").write_text(_render_skill(spec), encoding="utf-8")
+    reference_dir = skill_dir / "references"
+    reference_dir.mkdir(parents=True, exist_ok=True)
+    (reference_dir / "domain-checklist.ko.md").write_text(_render_domain_checklist(spec), encoding="utf-8")
+    mission_dir = target_dir / "mission_skill_templates"
+    mission_dir.mkdir(parents=True, exist_ok=True)
+    (mission_dir / "SKILL.md").write_text(_render_mission_skill(spec), encoding="utf-8")
+    reference_dir = mission_dir / "references"
+    reference_dir.mkdir(parents=True, exist_ok=True)
+    (reference_dir / "mission-examples.ko.md").write_text(_render_mission_examples(spec), encoding="utf-8")
+    research_dir = target_dir / "deep_research_skill_templates"
+    research_dir.mkdir(parents=True, exist_ok=True)
+    (research_dir / "SKILL.md").write_text(_render_deep_research_skill(spec), encoding="utf-8")
     _write_variant_manifest(target_dir / "variant.yaml", spec)
 
 
@@ -435,12 +464,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "{spec.package_name}"
-version = "1.1.4"
+version = "1.2.0"
 description = "{_toml_string(spec.description)}"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-dependencies = ["ai-wiki>=1.1,<1.2"]
+dependencies = ["ai-wiki>=1.2,<1.3"]
 
 [project.scripts]
 {spec.command_name} = "{spec.module_name}.cli:cli"
@@ -457,7 +486,7 @@ where = ["src"]
 include = ["{spec.module_name}*"]
 
 [tool.setuptools.package-data]
-{spec.module_name} = ["skill_templates/*.md", "variant.yaml"]
+{spec.module_name} = ["skill_templates/*.md", "skill_templates/references/*.md", "mission_skill_templates/*.md", "mission_skill_templates/references/*.md", "deep_research_skill_templates/*.md", "variant.yaml"]
 """
     path.write_text(text, encoding="utf-8")
 
@@ -531,7 +560,7 @@ def _render_skill(spec: VariantSpec) -> str:
     )
     return f"""---
 name: {spec.skill_name}
-version: 1.1.4
+version: 1.2.0
 description: {spec.description} Use this skill whenever the request is about {trigger_text} knowledge, research, records, or retrieval in this dedicated domain. {routing_text}
 user-invocable: true
 argument-hint: "[capabilities|context|get|record-use|patch|create] [query or options]"
@@ -608,6 +637,10 @@ a known event and its participant IDs.
 
 {routing_text}
 
+Read `references/domain-checklist.ko.md` before writing domain knowledge. It adds
+domain-specific checks and does not replace the shared evidence, identity, and
+authorization rules above.
+
 ## Common Commands
 
 ```bash
@@ -630,4 +663,137 @@ When writing knowledge:
 - mark uncertainty with lower `confidence`, `limitations`, or verification metadata
 - prefer categories under `{spec.domain}/...`
 - treat `version_conflict` and `duplicate_conflict` as required re-read decisions
+"""
+
+
+def _render_domain_checklist(spec: VariantSpec) -> str:
+    rules = {
+        "law": [
+            "관할, 적용 법령·판례, 기준 시점과 사건의 절차 단계를 분리해 기록한다.",
+            "확인된 사실, 당사자 주장, 법률 의견, 미확정 쟁점을 근거와 함께 구분한다.",
+        ],
+        "labor": [
+            "근로자성·고용관계, 근로계약·취업규칙·단체협약의 적용 순서를 확인한다.",
+            "임금·근로시간·해고·사회보험은 효력일과 적용 사업장·근로자를 함께 기록한다.",
+        ],
+        "tax": [
+            "세목, 과세기간·과세연도, 납세의무자, 신고·납부 기한과 적용 법령의 효력일을 확인한다.",
+            "계산 가정, 확정된 수치, 상담 의견과 관할 세무서·국가 차이를 분리한다.",
+        ],
+        "business": [
+            "고객·거래처·상담·업무 기록은 실제 식별자와 권한 범위를 보존하고, 허용된 위키 루트에만 기록한다.",
+            "상담 사실, 후속 조치, 담당자, 약속한 기한, 추정·의견을 구분하고 출처를 연결한다.",
+        ],
+    }
+    checklist = rules.get(spec.domain, [
+        "도메인의 적용 범위·기준 시점·근거를 기록하고 확인된 사실과 의견을 구분한다.",
+        "식별 정보와 권한 경계를 보존하며, 다른 위키의 비공개 기록을 이동하지 않는다.",
+    ])
+    items = "\n".join(f"- {item}" for item in checklist)
+    return f"""# {spec.display_name} 도메인 검토 체크리스트
+
+이 문서는 합성 또는 이미 승인된 공개 예시만 전제로 한다. 사용자 비공개 데이터·자격증명·다른 위키의 기록을 예시에 넣지 않는다.
+
+{items}
+
+완료 전에 위 항목과 공통 스킬의 근거·인용·엔터티 보존·권한 규칙을 모두 확인한다.
+"""
+
+
+def _render_mission_skill(spec: VariantSpec) -> str:
+    """Render a Mission skill that cannot silently target the generic CLI."""
+    command = spec.command_name
+    return f"""---
+name: {spec.skill_name}-missions
+version: 1.2.0
+description: Execute approved {spec.display_name} Missions only through the {command} CLI and its isolated wiki root.
+user-invocable: true
+argument-hint: "[research|plan|execute|resume|status|review]"
+---
+
+# {spec.display_name} Missions
+
+This skill operates only on the {spec.display_name} root selected by `{spec.env_prefix}_ROOT`.
+Never substitute `ai-wiki` or another variant command: a command mismatch can read or write a different Mission ledger.
+
+## Mandatory workflow
+
+1. Run `{command} capabilities` and use the configured authoring language.
+2. Before execution, read the exact plan revision with `{command} plan get <plan-id>` and confirm it is approved.
+3. Start or resume only this variant's run. Normal execution reads `{command} run next <run-id>`.
+4. Claim one ready task with its `run_revision`, perform it outside the wiki, and submit file, command, test, source, or decision evidence.
+5. Submit the task for independent review. Do not mark your own task completed.
+6. On interruption, record an in-language handoff with state, changed files, remaining work, blockers, and evidence.
+
+## Compact reads
+
+```bash
+{command} run next <run-id>
+{command} task context <run-id> <task-id>
+{command} run summary <run-id>
+{command} run evidence <run-id> --criterion <criterion-id>
+{command} run status <run-id> --full
+```
+
+## Root isolation
+
+- Expected CLI: `{command}`
+- Expected skill ID: `{spec.skill_name}-missions`
+- Expected root selector: `{spec.env_prefix}_ROOT`
+- If the CLI, root, plan, or run belongs to another wiki, stop and correct the command before any write.
+
+## Language and audit material
+
+Use the configured wiki language for objectives, instructions, criteria, results, and handoffs. Preserve commands, paths, hashes, IDs, and original errors exactly. Keep every approved revision and audit record; never delete autonomously.
+
+Read `references/mission-examples.ko.md` before creating a Mission document or submitting evidence.
+"""
+
+
+def _render_mission_examples(spec: VariantSpec) -> str:
+    return f"""# {spec.display_name} Mission 최소 유효 예시
+
+이 variant의 Mission은 반드시 `{spec.command_name}`과 `{spec.env_prefix}_ROOT`를 사용한다.
+ResearchReport는 `workspace_root`, 한국어 scope·findings·recommendations를 포함한다.
+WorkPlan은 승인 대기 상태와 작업별 instructions·acceptance_criteria·verification을 포함한다.
+WorkRun은 승인된 정확한 plan revision을 고정하고, evidence에는 파일·명령·테스트 결과와 criterion ID를 연결한다.
+
+```bash
+{spec.command_name} plan get <plan-id>
+{spec.command_name} run next <run-id>
+{spec.command_name} task claim <run-id> <task-id> --if-revision <run-revision>
+{spec.command_name} task submit <run-id> <task-id> --evidence-file evidence.json --if-revision <run-revision>
+```
+
+제출자는 완료를 결정하지 않는다. reviewer 또는 owner가 독립적으로 evidence와 기준을 검토한다.
+"""
+
+
+def _render_deep_research_skill(spec: VariantSpec) -> str:
+    return f"""---
+name: {spec.skill_name}-deep-research
+version: 1.2.0
+description: Run evidence-led deep research for {spec.display_name}; use only {spec.command_name} and {spec.env_prefix}_ROOT.
+user-invocable: true
+argument-hint: "[read-only|report] <research question>"
+---
+
+# {spec.display_name} Deep Research
+
+Use `{spec.command_name}` with `{spec.env_prefix}_ROOT` only; never read or
+write another wiki root. First create a decision brief (scope, exclusions, time
+boundary, source types, and stop condition), then retrieve local context before
+collecting only needed authoritative external sources.
+
+Build a claim ledger before prose. Map every material claim to source IDs and
+known time as supported/contested/insufficient/out_of_scope. Compare conflicting
+sources explicitly and state what would resolve an unresolved conflict. Stop when
+the source threshold is met, new sources add no material information, the budget
+is reached, or a required source is unavailable.
+
+`read-only` is the default. Create a ResearchReport only when the user requests
+Mission registration or explicitly authorizes durable writeback; it never starts
+implementation. When web access is unavailable, do not claim current external
+facts are verified. Keep URLs, commands, paths, hashes, and source IDs verbatim
+even when writing Korean or English prose.
 """

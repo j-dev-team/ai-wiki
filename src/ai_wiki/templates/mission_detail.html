@@ -53,6 +53,19 @@
       {% if next_revision %}<a rel="next" href="{{ url_for('mission_detail_view', mission_id=mission.id, revision=next_revision, lang=lang) }}">r{{ next_revision }} →</a>{% else %}<span aria-disabled="true">→</span>{% endif %}
     </nav>
 
+    {% if mission.control and not mission.control.degraded %}
+    <section class="mission-command-panel" aria-labelledby="command-panel-title">
+      <div><p class="mission-kicker">{{ t('missions.command_state') }}</p><h2 id="command-panel-title">{{ t('missions.next_task') }}</h2></div>
+      <dl>
+        <div><dt>{{ t('missions.pinned_revision') }}</dt><dd>{{ mission.control.pinned_plan_id }} · r{{ mission.control.pinned_plan_revision }}</dd></div>
+        <div><dt>{{ t('missions.status') }}</dt><dd>{{ easy(mission.control.run_status) }}</dd></div>
+        <div><dt>{{ t('missions.approval') }}</dt><dd>{{ easy(mission.control.approval_status) }}</dd></div>
+      </dl>
+      {% if mission.control.next_task %}<p><strong>{{ mission.control.next_task.id }} · {{ mission.control.next_task.title }}</strong><span>{{ mission.control.next_task.instruction }}</span></p>{% else %}<p>{{ t('missions.no_active_run') }}</p>{% endif %}
+      <nav aria-label="{{ t('missions.command_state') }}"><a href="#tasks-title">{{ t('mission_tasks.title') }}</a><a href="#evidence-title">{{ t('missions.audit_ledger') }}</a></nav>
+    </section>
+    {% endif %}
+
     {% if mission.degraded %}
     <section class="mission-degraded" aria-labelledby="degraded-title">
       <h2 id="degraded-title">{{ t('mission_detail.degraded_title') }}</h2>
@@ -208,7 +221,7 @@
               <div><p class="mission-task-id">{{ task.id }}</p><h3 id="task-title-{{ task.id }}">{{ task.title }}</h3></div>
               <span class="mission-task-status status-{{ task.status|replace('_', '-') }}">{{ easy(task.status) }}</span>
             </header>
-            <details class="mission-task-disclosure" open>
+            <details class="mission-task-disclosure" {% if mission.control and mission.control.next_task and mission.control.next_task.id == task.id %}open{% endif %}>
               <summary>{{ t('accessibility.task_disclosure') }}</summary>
             <dl class="mission-task-facts">
               <div><dt>{{ t('mission_tasks.assignee') }}</dt><dd>{{ task.assigned_to or t('mission_tasks.not_recorded') }}</dd></div>
@@ -296,7 +309,7 @@
       {% if mission.evidence %}
       <div class="mission-evidence-list">
         {% for item in mission.evidence %}
-        <details class="mission-evidence-card" id="evidence-{{ item.evidence_id }}" open aria-labelledby="evidence-title-{{ item.evidence_id }}">
+        <details class="mission-evidence-card" id="evidence-{{ item.evidence_id }}" aria-labelledby="evidence-title-{{ item.evidence_id }}">
           <summary><div><span>{{ label(item.type) }}</span><h3 id="evidence-title-{{ item.evidence_id }}">{{ item.evidence_id }}</h3></div><span>{{ item.criterion_links|length }} {{ t('mission_evidence.linked_criteria') }}</span></summary>
           {% if item.result == '[redacted]' or item.locator == '[redacted]' or item.content_hash == '[redacted]' %}<p class="mission-evidence-state is-redacted">{{ t('mission_evidence.redacted_help') }}</p>{% endif %}
           {% if item.result == '[unavailable]' or item.locator == '[unavailable]' %}<p class="mission-evidence-state is-unavailable">{{ t('mission_evidence.unavailable_help') }}</p>{% endif %}
@@ -322,11 +335,11 @@
 
     <section class="mission-trace-section" aria-labelledby="trace-title">
       <div class="mission-section-heading"><p class="mission-kicker">{{ t('mission_trace.audit_record') }}</p><h2 id="trace-title">{{ t('mission_trace.title') }}</h2></div>
-      <div class="mission-trace-grid">
+      <details class="mission-trace-disclosure"><summary>{{ t('missions.audit_ledger') }}</summary><div class="mission-trace-grid">
         <section aria-labelledby="mission-history-title"><h3 id="mission-history-title">{{ t('mission_trace.mission_history') }}</h3><ol>{% for event in mission.history %}<li><time>{{ event.at }}</time><strong>{{ easy(event.new_status) }}</strong><span>{{ event.actor }}</span><p>{{ event.reason or t('mission_trace.no_reason') }}</p></li>{% else %}<li class="mission-section-empty">{{ t('mission_trace.empty') }}</li>{% endfor %}</ol></section>
         <section aria-labelledby="execution-events-title"><h3 id="execution-events-title">{{ t('mission_trace.execution_events') }}</h3><ol>{% for event in mission.execution_events %}<li><time>{{ event.at }}</time><strong>{{ easy(event.new_status) }}</strong><span>{{ event.actor }}</span><p>{{ event.reason or t('mission_trace.no_reason') }}</p></li>{% else %}<li class="mission-section-empty">{{ t('mission_trace.empty') }}</li>{% endfor %}</ol></section>
         <section aria-labelledby="review-decisions-title"><h3 id="review-decisions-title">{{ t('mission_trace.review_decisions') }}</h3><ol>{% for event in mission.review_decisions %}<li><time>{{ event.at }}</time><strong>{{ easy(event.new_status) }}</strong><span>{{ event.actor }}</span><p>{{ event.reason or t('mission_trace.no_reason') }}</p></li>{% else %}<li class="mission-section-empty">{{ t('mission_trace.empty') }}</li>{% endfor %}</ol></section>
-      </div>
+      </div></details>
     </section>
 
     <footer class="mission-readonly-note"><span aria-hidden="true">◉</span><p><strong>{{ t('mission_detail.readonly') }}</strong> {{ t('mission_detail.readonly_help') }}</p></footer>

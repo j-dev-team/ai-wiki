@@ -364,6 +364,11 @@ def test_mission_skill_template_and_installed_copy_use_compact_flow(
     cli_module._install_skills_for_agents(["codex"], "sample-wiki", [])
     installed = (tmp_path / "sample-wiki-missions" / "SKILL.md").read_text(encoding="utf-8")
     assert installed == template
+    deep_research = (tmp_path / "sample-wiki-deep-research" / "SKILL.md").read_text(encoding="utf-8")
+    assert "name: sample-wiki-deep-research" in deep_research
+    assert "Use `ai-wiki` and `AI_WIKI_ROOT`" in deep_research
+    assert "claim ledger" in deep_research
+    assert "read-only` is the default" in deep_research
 
 
 def test_large_run_summary_has_constant_queries_and_small_projection(wiki_root: Path):

@@ -94,6 +94,17 @@
               <span>{{ t('missions.approval') }}</span><strong>{{ easy(summary.approval_status) }}</strong>
               {% endif %}
             </div>
+            {% set control = summary.control %}
+            {% if control and not control.degraded %}
+            <section class="mission-next-action" aria-label="{{ t('missions.command_state') }}">
+              <div><span>{{ t('missions.pinned_revision') }}</span><strong>{{ control.pinned_plan_id }} · r{{ control.pinned_plan_revision }}</strong></div>
+              {% if control.next_task %}
+              <div><span>{{ t('missions.next_task') }}</span><strong>{{ control.next_task.id }} · {{ control.next_task.title }}</strong><p>{{ control.next_task.instruction }}</p></div>
+              {% else %}<div><span>{{ t('missions.next_task') }}</span><strong>{{ t('missions.no_active_run') }}</strong></div>{% endif %}
+              {% if control.blocked_task_ids %}<div class="mission-next-blocked"><span>{{ t('missions.execution_blocked') }}</span><strong>{{ control.blocked_task_ids|join(', ') }}</strong></div>{% endif %}
+              <a href="{{ control.audit_href }}&amp;lang={{ lang }}">{{ t('missions.view_execution') }}</a>
+            </section>
+            {% endif %}
             {% if summary.degraded %}
             <p class="mission-row-warning"><strong>{{ t('missions.degraded') }}</strong> {{ t('missions.degraded_help') }}</p>
             {% endif %}
