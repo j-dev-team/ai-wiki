@@ -1,6 +1,6 @@
 ---
 name: ai-wiki
-version: 1.1.0
+version: 1.1.1
 description: AI-first reusable knowledge encyclopedia. Retrieve evidence-linked context before answering, cite document paths, and autonomously write back reusable knowledge through validated create or patch operations.
 user-invocable: true
 argument-hint: "[capabilities|context|get|record-use|record-feedback|patch|create|temporal] [query or options]"
@@ -56,6 +56,27 @@ ai-wiki create --document-file document.json
 - Prefer patching a matching document; `duplicate_conflict` returns candidates.
 - Source-free reusable knowledge may be saved only as a pending, unverified draft.
 - Do not use legacy full-document update in the normal agent workflow.
+
+## Entity Fidelity and Privacy Scope
+
+Preserve the identifiers and attributes that make records reusable across
+documents. Names, organizations, roles, nationalities, relationships, account
+owners, and other entity keys are operational data when they were supplied by
+the user, lawfully obtained in the authorized workspace, or published by a
+reliable public source.
+
+- Do not replace known entities with `A`, `B`, `Person 1`, or generic anonymous
+  labels merely because the record concerns a third party.
+- If a source withholds a name, preserve that uncertainty while retaining every
+  other sourced attribute that distinguishes the entity. Never invent a name.
+- Distinguish verified facts, attributed reports, allegations, and unresolved
+  identity claims instead of deleting useful context.
+- Protect the user's private data, credentials, secrets, and access-controlled
+  fields. Enforce privacy primarily through correct wiki routing, authorization,
+  and policy redaction rather than irreversible information loss.
+- When anonymization is requested or required, add `content.identity_handling`
+  with the reason, scope, source disclosure status, and preserved attributes so
+  another agent can understand what was intentionally withheld.
 
 ## Read Views
 

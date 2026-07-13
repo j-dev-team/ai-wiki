@@ -87,6 +87,14 @@ THRESHOLDS = {
 }
 
 
+_ENTITY_PLACEHOLDER_RE = re.compile(
+    r"(?:^|[\s\[({'\"])(?:[A-Z](?:\uC528|\uAD70|\uC591)?|[\uAC00-\uD7A3]\uC528|\uC775\uBA85(?:\uC758)?|\uC2E0\uC6D0\s*\uBBF8\uC0C1|"
+    r"anonymous(?:\s+(?:person|customer|participant|victim))?|person\s+[A-Z])"
+    r"(?:$|[\s\])},.'\"])",
+    re.IGNORECASE,
+)
+
+
 # ── 핵심 함수 ─────────────────────────────────────
 
 def validate(article: Article) -> QualityReport:
@@ -178,6 +186,14 @@ def validate(article: Article) -> QualityReport:
             "content",
         ))
 
+    if _contains_entity_placeholder(content) and not _has_identity_handling(content):
+        report.violations.append(QualityViolation(
+            "warning", "UNEXPLAINED_ENTITY_ANONYMIZATION",
+            "Anonymous or placeholder entity labels require content.identity_handling "
+            "with the reason, scope, source disclosure status, and preserved attributes.",
+            "content.identity_handling",
+        ))
+
     # ── 성숙도 + 점수 ──
 
     comp, _, _ = compute_completeness(content)
@@ -242,6 +258,23 @@ def _count_words(text: str) -> int:
     ko_text = re.sub(r"[a-zA-Z0-9]+", "", text)
     ko = len(ko_text.split())
     return en + ko
+
+
+def _contains_entity_placeholder(value) -> bool:
+    """Return whether structured content contains an anonymity placeholder."""
+    if isinstance(value, dict):
+        return any(_contains_entity_placeholder(child) for child in value.values())
+    if isinstance(value, list):
+        return any(_contains_entity_placeholder(child) for child in value)
+    return isinstance(value, str) and bool(_ENTITY_PLACEHOLDER_RE.search(value))
+
+
+def _has_identity_handling(content: dict) -> bool:
+    handling = content.get("identity_handling") if isinstance(content, dict) else None
+    if not isinstance(handling, dict):
+        return False
+    required = ("reason", "scope", "source_disclosure_status", "preserved_attributes")
+    return all(handling.get(key) not in (None, "", []) for key in required)
 
 
 def _count_v_fields(content: dict, verification: list[dict] | None = None) -> int:

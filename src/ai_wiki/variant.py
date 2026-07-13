@@ -399,7 +399,7 @@ def _find_installed_command(command_name: str, python_executable: str | None = N
 def _write_variant_module(target_dir: Path, spec: VariantSpec) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
     runtime_spec = repr(spec.as_dict())
-    (target_dir / "__init__.py").write_text('__version__ = "1.1.0"\n', encoding="utf-8")
+    (target_dir / "__init__.py").write_text('__version__ = "1.1.1"\n', encoding="utf-8")
     (target_dir / "cli.py").write_text(
         "from pathlib import Path\n\n"
         "from ai_wiki.runtime import activate_variant\n\n"
@@ -435,7 +435,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "{spec.package_name}"
-version = "1.1.0"
+version = "1.1.1"
 description = "{_toml_string(spec.description)}"
 readme = "README.md"
 license = "MIT"
@@ -531,7 +531,7 @@ def _render_skill(spec: VariantSpec) -> str:
     )
     return f"""---
 name: {spec.skill_name}
-version: 1.1.0
+version: 1.1.1
 description: {spec.description} Use this skill whenever the request is about {trigger_text} knowledge, research, records, or retrieval in this dedicated domain. {routing_text}
 user-invocable: true
 argument-hint: "[capabilities|context|get|record-use|patch|create] [query or options]"
@@ -564,6 +564,26 @@ Answer using returned citation keys, then record actual use:
 ```
 
 If context is insufficient, record that outcome, research, patch or create reusable knowledge, and run context again. Never delete autonomously.
+
+## Entity Fidelity and Privacy Scope
+
+Preserve identifiers and attributes that let agents connect the same person,
+organization, customer, matter, or participant across records. Names, roles,
+nationalities, relationships, and other entity keys are operational data when
+the user supplied them, they were lawfully obtained in this authorized wiki, or
+a reliable public source published them.
+
+- Do not replace known entities with `A`, `B`, `Person 1`, or generic anonymous
+  labels merely because the record concerns a third party.
+- If a source withholds a name, keep the name unknown but preserve every other
+  sourced attribute that distinguishes the entity. Never invent a name.
+- Distinguish verified facts, attributed reports, allegations, and unresolved
+  identity claims instead of deleting useful context.
+- Protect the user's private data, credentials, secrets, and access-controlled
+  fields through correct routing, authorization, and policy redaction rather
+  than irreversible information loss.
+- When anonymization is requested or required, add `content.identity_handling`
+  with its reason, scope, source disclosure status, and preserved attributes.
 
 ## Routing Priority
 

@@ -261,6 +261,46 @@ class SecurityPolicy:
         }
         return output, sorted(set(redacted))
 
+    def redact_mission_execution(
+        self, principal: Principal, execution: dict[str, Any],
+    ) -> tuple[dict[str, Any], list[str]]:
+        """Redact compact execution projections without changing their shape."""
+        output = deepcopy(execution)
+        redacted: list[str] = []
+        visibility = self.mission_visibility(principal)
+
+        def visit(value: Any, path: str = "") -> None:
+            if isinstance(value, dict):
+                if value.get("evidence_id") and "locator" in value:
+                    if visibility == "reader":
+                        for field in ("result", "locator", "source_ids"):
+                            if value.get(field) not in (None, "", []):
+                                value[field] = [] if field == "source_ids" else "[redacted]"
+                                redacted.append(f"{path}/{field}")
+                    elif visibility == "agent" and self._private_path(value.get("locator")):
+                        value["locator"] = "[redacted]"
+                        redacted.append(f"{path}/locator")
+                for key, child in list(value.items()):
+                    visit(child, f"{path}/{key}")
+            elif isinstance(value, list):
+                for index, child in enumerate(value):
+                    visit(child, f"{path}/{index}")
+
+        visit(output)
+        handoff = output.get("handoff")
+        if visibility == "reader" and isinstance(handoff, dict):
+            for field in ("blockers",):
+                if handoff.get(field):
+                    handoff[field] = []
+                    redacted.append(f"/handoff/{field}")
+        output = self._redact_secret_values(output, "", redacted)
+        output["policy"] = {
+            "effect": "redact" if redacted else "allow",
+            "visibility": visibility,
+            "redacted_fields": sorted(set(redacted)),
+        }
+        return output, sorted(set(redacted))
+
 
 def namespace_for_kind(kind: str) -> str:
     return {

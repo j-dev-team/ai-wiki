@@ -516,6 +516,278 @@ class MissionStore:
                 ready.append(task.id)
         return ready
 
+    @staticmethod
+    def _compact_text(value: Any, limit: int = 320) -> dict[str, Any]:
+        text = str(value or "")
+        truncated = len(text) > limit
+        return {
+            "text": text[:limit] if truncated else text,
+            "truncated": truncated,
+        }
+
+    @classmethod
+    def _evidence_summary(cls, evidence: MissionEvidence) -> dict[str, Any]:
+        return {
+            "evidence_id": evidence.evidence_id,
+            "type": evidence.type,
+            "locator": evidence.locator,
+            "result": cls._compact_text(evidence.result),
+            "criterion_ids": list(evidence.criterion_ids),
+            "source_ids": list(evidence.source_ids),
+            "captured_at": evidence.captured_at.isoformat().replace("+00:00", "Z"),
+            "captured_by": evidence.captured_by,
+        }
+
+    def _execution_documents(
+        self, run_id: str,
+    ) -> tuple[MissionDocument, WorkRunPayload, MissionDocument, WorkPlanPayload]:
+        run = self.get(run_id)
+        if run is None or run.kind != "work_run":
+            raise ValueError("run_not_found")
+        run_payload = WorkRunPayload.model_validate(run.payload)
+        plan = self.get(run_payload.plan_id, run_payload.plan_revision)
+        if plan is None or plan.kind != "work_plan":
+            raise ValueError("pinned_plan_revision_missing")
+        return run, run_payload, plan, WorkPlanPayload.model_validate(plan.payload)
+
+    def _active_leases(self, run_id: str) -> dict[str, dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT task_id, owner, acquired_at, heartbeat_at, expires_at "
+            "FROM task_leases WHERE run_id=? AND expires_at>? ORDER BY task_id",
+            (run_id, utc_text()),
+        ).fetchall()
+        return {
+            row["task_id"]: {
+                "owner": row["owner"],
+                "acquired_at": row["acquired_at"],
+                "heartbeat_at": row["heartbeat_at"],
+                "expires_at": row["expires_at"],
+            }
+            for row in rows
+        }
+
+    def _execution_base(
+        self, run: MissionDocument, run_payload: WorkRunPayload,
+        plan: MissionDocument, plan_payload: WorkPlanPayload,
+    ) -> dict[str, Any]:
+        states = {item.task_id: item for item in run_payload.task_states}
+        counts = Counter(item.status for item in run_payload.task_states)
+        evidence = list(run.evidence)
+        global_criteria = criterion_records(
+            plan_payload.acceptance_criteria, scope="global", owner_id=plan_payload.plan_id,
+        )
+        task_criteria = {
+            task.id: criterion_records(
+                task.acceptance_criteria, scope="task",
+                owner_id=f"{plan_payload.plan_id}:{task.id}",
+            )
+            for task in plan_payload.tasks
+        }
+        covered = sum(
+            1 for criterion in global_criteria
+            if any(
+                not criterion_coverage_keys(criterion).isdisjoint(item.criterion_ids)
+                for item in evidence
+            )
+        )
+        evidence_by_id = {item.evidence_id: item for item in evidence}
+        for task_id, criteria in task_criteria.items():
+            state = states.get(task_id)
+            linked = [
+                evidence_by_id[evidence_id]
+                for evidence_id in (state.evidence_ids if state else [])
+                if evidence_id in evidence_by_id
+            ]
+            covered += sum(
+                1 for criterion in criteria
+                if any(
+                    not criterion_coverage_keys(criterion).isdisjoint(item.criterion_ids)
+                    for item in linked
+                )
+            )
+        criterion_total = len(global_criteria) + sum(map(len, task_criteria.values()))
+        handoff = handoff_view(run_payload.handoff)
+        leases = self._active_leases(run.id)
+        ready = [
+            task.id for task in plan_payload.tasks
+            if states.get(task.id) is not None
+            and states[task.id].status in {"planned", "ready"}
+            and all(
+                states.get(dependency) is not None
+                and states[dependency].status == "completed"
+                for dependency in task.dependencies
+            )
+        ]
+        blocked = [
+            {
+                "task_id": state.task_id,
+                "result": self._compact_text(state.result),
+            }
+            for state in run_payload.task_states if state.status == "blocked"
+        ]
+        return {
+            "run_id": run.id,
+            "run_revision": run.revision,
+            "status": run.status,
+            "pinned_plan": {
+                "plan_id": plan.id,
+                "plan_revision": plan.revision,
+                "status": plan.status,
+                "approval_status": plan_payload.approval.status,
+            },
+            "task_counts": {
+                "total": len(run_payload.task_states),
+                **{status: int(counts.get(status, 0)) for status in (
+                    "planned", "ready", "in_progress", "blocked", "failed",
+                    "in_review", "completed", "skipped", "cancelled",
+                )},
+            },
+            "criterion_counts": {
+                "total": criterion_total,
+                "covered": covered,
+                "missing": criterion_total - covered,
+            },
+            "evidence_count": len(evidence),
+            "ready_tasks": ready,
+            "blocked_tasks": blocked,
+            "active_leases": [
+                {"task_id": task_id, **lease} for task_id, lease in leases.items()
+            ],
+            "handoff": {
+                "present": bool(run_payload.handoff),
+                "current_state": handoff["current_state"],
+                "remaining_work": handoff["remaining_work"],
+                "blockers": handoff["blockers"],
+                "next_owner": handoff["next_owner"],
+            },
+            "retrieval": {
+                "full_command": f"ai-wiki run status {run.id} --full",
+            },
+        }
+
+    def run_summary(self, run_id: str) -> dict[str, Any]:
+        """Return a deterministic compact projection of a WorkRun."""
+        run, run_payload, plan, plan_payload = self._execution_documents(run_id)
+        return self._execution_base(run, run_payload, plan, plan_payload)
+
+    def task_context(self, run_id: str, task_id: str) -> dict[str, Any]:
+        """Return the minimum complete context needed to execute or resume one task."""
+        run, run_payload, plan, plan_payload = self._execution_documents(run_id)
+        task = next((item for item in plan_payload.tasks if item.id == task_id), None)
+        if task is None:
+            raise ValueError("task_not_found")
+        states = {item.task_id: item for item in run_payload.task_states}
+        state = states.get(task_id)
+        if state is None:
+            raise ValueError("task_state_missing")
+        evidence_by_id = {item.evidence_id: item for item in run.evidence}
+        criteria = criterion_records(
+            task.acceptance_criteria, scope="task",
+            owner_id=f"{plan_payload.plan_id}:{task.id}",
+        )
+        criterion_views = []
+        linked_evidence_ids: set[str] = set(state.evidence_ids)
+        for criterion in criteria:
+            matching = [
+                evidence_by_id[evidence_id]
+                for evidence_id in state.evidence_ids
+                if evidence_id in evidence_by_id
+                and not criterion_coverage_keys(criterion).isdisjoint(
+                    evidence_by_id[evidence_id].criterion_ids
+                )
+            ]
+            linked_evidence_ids.update(item.evidence_id for item in matching)
+            criterion_views.append({
+                "criterion_id": criterion.id,
+                "text": criterion.text,
+                "covered": bool(matching),
+                "evidence_ids": [item.evidence_id for item in matching],
+            })
+        dependencies = []
+        for dependency_id in task.dependencies:
+            dependency = states.get(dependency_id)
+            dependencies.append({
+                "task_id": dependency_id,
+                "status": dependency.status if dependency else "missing",
+                "result": self._compact_text(dependency.result if dependency else ""),
+                "evidence_ids": list(dependency.evidence_ids) if dependency else [],
+            })
+        leases = self._active_leases(run_id)
+        base = self._execution_base(run, run_payload, plan, plan_payload)
+        base["task"] = {
+            "task_id": task.id,
+            "title": task.title,
+            "instructions": task.instructions,
+            "authorization": list(task.authorization),
+            "resources": list(task.resources),
+            "verification": list(task.verification),
+            "dependencies": dependencies,
+            "state": {
+                **state.model_dump(mode="json", exclude={"result"}),
+                "result": self._compact_text(state.result),
+            },
+            "lease": leases.get(task_id),
+            "criteria": criterion_views,
+            "existing_evidence": [
+                self._evidence_summary(evidence_by_id[evidence_id])
+                for evidence_id in sorted(linked_evidence_ids)
+                if evidence_id in evidence_by_id
+            ],
+        }
+        return base
+
+    def next_task_context(self, run_id: str) -> dict[str, Any]:
+        """Return the first ready task in pinned-plan order with execution context."""
+        ready = self.ready_tasks(run_id)
+        if not ready:
+            summary = self.run_summary(run_id)
+            summary["task"] = None
+            return summary
+        return self.task_context(run_id, ready[0])
+
+    def criterion_evidence(self, run_id: str, criterion_id: str) -> dict[str, Any]:
+        """Return only evidence linked to one exact or legacy criterion key."""
+        run, run_payload, plan, plan_payload = self._execution_documents(run_id)
+        criteria = [
+            (criterion, None) for criterion in criterion_records(
+                plan_payload.acceptance_criteria, scope="global", owner_id=plan_payload.plan_id,
+            )
+        ]
+        for task in plan_payload.tasks:
+            criteria.extend(
+                (criterion, task.id) for criterion in criterion_records(
+                    task.acceptance_criteria, scope="task",
+                    owner_id=f"{plan_payload.plan_id}:{task.id}",
+                )
+            )
+        resolved = next(
+            (item for item in criteria if criterion_id in criterion_coverage_keys(item[0])), None,
+        )
+        if resolved is None:
+            raise ValueError("criterion_not_found")
+        criterion, task_id = resolved
+        allowed_ids = None
+        if task_id is not None:
+            state = next(
+                (item for item in run_payload.task_states if item.task_id == task_id), None,
+            )
+            allowed_ids = set(state.evidence_ids if state else [])
+        matching = [
+            item for item in run.evidence
+            if not criterion_coverage_keys(criterion).isdisjoint(item.criterion_ids)
+            and (allowed_ids is None or item.evidence_id in allowed_ids)
+        ]
+        base = self._execution_base(run, run_payload, plan, plan_payload)
+        base["criterion"] = {
+            "criterion_id": criterion.id,
+            "text": criterion.text,
+            "scope": criterion.scope,
+            "task_id": task_id,
+            "covered": bool(matching),
+        }
+        base["evidence"] = [self._evidence_summary(item) for item in matching]
+        return base
+
     def _expire_leases(self) -> None:
         now = utc_text()
         self.conn.execute("DELETE FROM resource_locks WHERE expires_at<=?", (now,))

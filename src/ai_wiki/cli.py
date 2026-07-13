@@ -1037,6 +1037,12 @@ def capabilities(ctx, principal):
                 "authoring_language": language.language,
                 "source_language_field": "metadata.source_language",
                 "localizations_field": "localizations",
+                "execution_reads": {
+                    "commands": ["run summary", "run next", "task context", "run evidence"],
+                    "status_default": "compact",
+                    "full_ledger": "run status --full",
+                    "revision_field": "run_revision",
+                },
             },
         },
         "language": {
@@ -1988,19 +1994,84 @@ def run_start(ctx, plan_id, run_id, principal, dry_run):
 @run_group.command("status")
 @click.argument("run_id")
 @click.option("--principal", default=None)
+@click.option("--full", "full_view", is_flag=True, help="Return the complete immutable ledger view")
 @click.pass_context
-def run_status(ctx, run_id, principal):
+def run_status(ctx, run_id, principal, full_view):
     try:
-        _authorize(ctx, principal, "read", "runs")
+        policy, resolved = _authorize(ctx, principal, "read", "runs")
         store = _mission_store()
         try:
-            document = store.get(run_id)
-            ready = store.ready_tasks(run_id) if document else []
+            if full_view:
+                document = store.get(run_id)
+                ready = store.ready_tasks(run_id) if document else []
+            else:
+                summary = store.run_summary(run_id)
         finally:
             store.close()
-        if document is None:
-            raise ValueError("run_not_found")
-        output_json(protocol_success({"mission": document.model_dump(mode="json"), "ready_tasks": ready}))
+        if full_view:
+            if document is None:
+                raise ValueError("run_not_found")
+            output_json(protocol_success({
+                "mission": document.model_dump(mode="json"), "ready_tasks": ready,
+            }))
+        else:
+            summary, _ = policy.redact_mission_execution(resolved, summary)
+            output_json(protocol_success({"run": summary}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@run_group.command("summary")
+@click.argument("run_id")
+@click.option("--principal", default=None)
+@click.pass_context
+def run_summary(ctx, run_id, principal):
+    try:
+        policy, resolved = _authorize(ctx, principal, "read", "runs")
+        store = _mission_store()
+        try:
+            summary = store.run_summary(run_id)
+        finally:
+            store.close()
+        summary, _ = policy.redact_mission_execution(resolved, summary)
+        output_json(protocol_success({"run": summary}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@run_group.command("next")
+@click.argument("run_id")
+@click.option("--principal", default=None)
+@click.pass_context
+def run_next(ctx, run_id, principal):
+    try:
+        policy, resolved = _authorize(ctx, principal, "read", "runs")
+        store = _mission_store()
+        try:
+            context = store.next_task_context(run_id)
+        finally:
+            store.close()
+        context, _ = policy.redact_mission_execution(resolved, context)
+        output_json(protocol_success({"run": context}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@run_group.command("evidence")
+@click.argument("run_id")
+@click.option("--criterion", "criterion_id", required=True)
+@click.option("--principal", default=None)
+@click.pass_context
+def run_evidence(ctx, run_id, criterion_id, principal):
+    try:
+        policy, resolved = _authorize(ctx, principal, "read", "runs")
+        store = _mission_store()
+        try:
+            evidence = store.criterion_evidence(run_id, criterion_id)
+        finally:
+            store.close()
+        evidence, _ = policy.redact_mission_execution(resolved, evidence)
+        output_json(protocol_success({"run": evidence}))
     except Exception as exc:
         _mission_error(exc)
 
@@ -2068,6 +2139,25 @@ def task_ready(ctx, run_id, principal):
         finally:
             store.close()
         output_json(protocol_success({"run_id": run_id, "ready_tasks": ready}))
+    except Exception as exc:
+        _mission_error(exc)
+
+
+@task_group.command("context")
+@click.argument("run_id")
+@click.argument("task_id")
+@click.option("--principal", default=None)
+@click.pass_context
+def task_context(ctx, run_id, task_id, principal):
+    try:
+        policy, resolved = _authorize(ctx, principal, "read", "runs")
+        store = _mission_store()
+        try:
+            context = store.task_context(run_id, task_id)
+        finally:
+            store.close()
+        context, _ = policy.redact_mission_execution(resolved, context)
+        output_json(protocol_success({"run": context}))
     except Exception as exc:
         _mission_error(exc)
 

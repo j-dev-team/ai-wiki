@@ -80,7 +80,14 @@ class AIWikiClient:
                                          "knowledge_candidate"],
                             "authoring_language": language.language,
                             "source_language_field": "metadata.source_language",
-                            "localizations_field": "localizations"},
+                            "localizations_field": "localizations",
+                            "execution_reads": {
+                                "commands": ["run summary", "run next", "task context",
+                                             "run evidence"],
+                                "status_default": "compact",
+                                "full_ledger": "run status --full",
+                                "revision_field": "run_revision",
+                            }},
             },
             "language": {
                 **language.as_dict(),
@@ -224,6 +231,34 @@ class AIWikiClient:
             {"mission": detail},
             meta={"policy": detail["policy"]},
         )
+
+    def mission_run_summary(self, run_id: str) -> dict[str, Any]:
+        principal = self._authorize("read", "runs")
+        result, _ = self.policy.redact_mission_execution(
+            principal, self.missions.run_summary(run_id),
+        )
+        return success({"run": result})
+
+    def mission_run_next(self, run_id: str) -> dict[str, Any]:
+        principal = self._authorize("read", "runs")
+        result, _ = self.policy.redact_mission_execution(
+            principal, self.missions.next_task_context(run_id),
+        )
+        return success({"run": result})
+
+    def mission_task_context(self, run_id: str, task_id: str) -> dict[str, Any]:
+        principal = self._authorize("read", "runs")
+        result, _ = self.policy.redact_mission_execution(
+            principal, self.missions.task_context(run_id, task_id),
+        )
+        return success({"run": result})
+
+    def mission_run_evidence(self, run_id: str, criterion_id: str) -> dict[str, Any]:
+        principal = self._authorize("read", "runs")
+        result, _ = self.policy.redact_mission_execution(
+            principal, self.missions.criterion_evidence(run_id, criterion_id),
+        )
+        return success({"run": result})
 
     def record_use(self, context_id: str, citations: list[str], outcome: str) -> dict:
         self._authorize("read", "knowledge")

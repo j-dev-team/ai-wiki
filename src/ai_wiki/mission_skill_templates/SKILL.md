@@ -1,6 +1,6 @@
 ---
 name: ai-wiki-missions
-version: 1.1.0
+version: 1.1.1
 description: Resume and execute approved AI Wiki Missions through revision-pinned plans, task leases, evidence submission, independent review, and handoff.
 user-invocable: true
 argument-hint: "[research|plan|execute|resume|status|review]"
@@ -17,9 +17,11 @@ AI Wiki never executes those operations itself.
 1. Run `ai-wiki capabilities` and inspect the Mission contract.
 2. Read `data.language.authoring_language` and its warning. Use that language
    for all human-facing Mission prose and record it as `metadata.source_language`.
-3. Read the latest plan and run. Never rely on a plan copied into a prompt.
+3. Before starting a run, read the exact plan revision from Missions. Never rely
+   on a plan copied into a prompt.
 4. Confirm that the exact plan revision is approved before starting a run.
-5. Select only a ready task, then claim its lease with the current run revision.
+5. For an existing run, use `ai-wiki run next <run-id>` as the normal execution
+   read. Select only its ready task, then claim the lease with `run_revision`.
 6. Perform the task outside AI Wiki and retain file, command, test, source, or
    human-decision evidence for every acceptance criterion.
 7. Submit evidence and move the task to `in_review`.
@@ -36,6 +38,25 @@ AI Wiki never executes those operations itself.
 - `resume`: inspect handoff, expired leases, pinned revision, and existing evidence before acting.
 - `status`: report plan, run, ready, blocked, failed, and review state without mutating it.
 - `review`: match evidence to each criterion and complete, fail, or reopen the task.
+
+## Compact execution reads
+
+Use one read that matches the current action. Do not call every compact command
+in sequence when `run next` already contains enough context.
+
+- Normal execution: `ai-wiki run next <run-id>` returns the next task together
+  with the pinned plan and approval, dependency results, criteria, existing
+  evidence summaries, lease, blockers, and handoff.
+- Resume one known task: `ai-wiki task context <run-id> <task-id>`.
+- Check progress: `ai-wiki run summary <run-id>` or the default compact
+  `ai-wiki run status <run-id>`.
+- Review one criterion: `ai-wiki run evidence <run-id> --criterion <criterion-id>`.
+- Audit, incident investigation, or recovery only: `ai-wiki run status <run-id> --full`.
+
+Every compact result includes `run_revision` and the exact pinned plan revision.
+Re-read after a mutation or revision conflict. The compact views omit complete
+history and evidence bodies; the immutable full ledger remains available with
+`--full`.
 
 Never delete autonomously, self-approve a plan, mark your own task completed,
 reuse a stale plan revision, or move knowledge between isolated wiki roots.

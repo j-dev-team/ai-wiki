@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1 - 2026-07-13
+
+- Add compact Mission execution reads for progress, next-task, task-context, and criterion-evidence retrieval while preserving the full immutable ledger.
+- Add entity-fidelity guidance to general and purpose-specific wiki skills so public, authorized, and user-provided entity attributes remain usable across records.
+- Warn when anonymous or placeholder entity labels lack an explicit `identity_handling` record describing the scope and preserved attributes.
+
 ## 1.1.0 - 2026-07-13
 
 - Add a shared `ko`/`en` authoring-language resolver across CLI, web, capabilities, and purpose-specific wiki runtimes.

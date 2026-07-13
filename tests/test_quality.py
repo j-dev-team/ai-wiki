@@ -68,6 +68,30 @@ def test_min_tags_warning():
     assert any(w.code == "MIN_TAGS" for w in report.warnings)
 
 
+def test_unexplained_entity_anonymization_warning():
+    content = dict(_make().content)
+    content["participants"] = ["A\uC528", "\uC775\uBA85 \uACE0\uAC1D"]
+
+    report = validate(_make(content=content))
+
+    assert any(w.code == "UNEXPLAINED_ENTITY_ANONYMIZATION" for w in report.warnings)
+
+
+def test_explained_entity_anonymization_preserves_quality():
+    content = dict(_make().content)
+    content["participants"] = ["A\uC528"]
+    content["identity_handling"] = {
+        "reason": "The public source withheld the participant's name.",
+        "scope": "participant name only",
+        "source_disclosure_status": "name withheld by source",
+        "preserved_attributes": ["role", "organization", "nationality"],
+    }
+
+    report = validate(_make(content=content))
+
+    assert not any(w.code == "UNEXPLAINED_ENTITY_ANONYMIZATION" for w in report.warnings)
+
+
 def test_multiple_errors():
     report = validate(_make(content={"x": "y"}, sources=[], tags=[]))
     assert report.passed is False

@@ -88,6 +88,9 @@ def test_variant_create_generates_independent_package(tmp_path):
     assert "name: law-wiki" in skill_text
     assert "law-wiki context" in skill_text
     assert "contracts, litigation" in skill_text
+    assert "Entity Fidelity and Privacy Scope" in skill_text
+    assert "content.identity_handling" in skill_text
+    assert "version: 1.1.1" in skill_text
     assert (package_dir / "src" / "law_wiki" / "variant.yaml").exists()
 
     manifest = yaml.safe_load((package_dir / "variant.yaml").read_text(encoding="utf-8"))
