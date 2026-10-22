@@ -111,6 +111,24 @@ def test_save_writes_canonical_v2_and_roundtrips(wiki_root, sample_article):
     assert load_article(sample_article.id).content["facts"] == ["fact 1", "fact 2"]
 
 
+def test_to_yaml_dict_terminates_when_duplicate_urls_reuse_generated_source_id():
+    document = migrate_v1_to_v2(_legacy_fixture())
+    duplicate_url = "https://example.com/duplicate"
+    document["sources"] = [
+        {"id": "src-first", "url": duplicate_url},
+        {"id": "src-2-2", "url": duplicate_url},
+    ]
+    for record in document["verification"]:
+        record["level"] = "unverified"
+        record["source_ids"] = []
+
+    serialized = Article.from_yaml(document).to_yaml_dict()
+    source_ids = [source["id"] for source in serialized["sources"]]
+
+    assert source_ids == ["src-2-2", "src-2-3"]
+    assert len(source_ids) == len(set(source_ids))
+
+
 def test_atomic_replace_failure_preserves_existing_file(wiki_root, sample_article):
     path = save_article(sample_article)
     original = path.read_bytes()

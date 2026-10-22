@@ -91,8 +91,10 @@ class Article:
                 else dict(existing_sources.get(url, {}))
             )
             source_id = record.get("id") or f"src-{index}"
+            suffix = len(used_source_ids) + 1
             while source_id in used_source_ids:
-                source_id = f"src-{index}-{len(used_source_ids) + 1}"
+                source_id = f"src-{index}-{suffix}"
+                suffix += 1
             record.update({"id": source_id, "url": url})
             used_source_ids.add(source_id)
             source_records.append(record)

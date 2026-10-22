@@ -59,19 +59,76 @@ def _deep_research_skill_templates_dir() -> Path:
     return local if local.exists() else Path(__file__).parent / "deep_research_skill_templates"
 
 
-def _install_deep_research_skill(destination: Path, *, skill_name: str) -> None:
+def _install_deep_research_skill(destination: Path, *, skill_name: str) -> list[str]:
     templates = _deep_research_skill_templates_dir()
     if not templates.exists():
-        return
-    destination.mkdir(parents=True, exist_ok=True)
-    for source in templates.rglob("*.md"):
-        target = destination / source.relative_to(templates)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        text = source.read_text(encoding="utf-8").replace("__SKILL_NAME__", skill_name)
+        return []
+    def _render(text: str) -> str:
+        text = text.replace("__SKILL_NAME__", skill_name)
         text = text.replace("__DISPLAY_NAME__", DISPLAY_NAME)
         text = text.replace("__COMMAND_NAME__", COMMAND_NAME)
-        text = text.replace("__ROOT_ENV_NAME__", ROOT_ENV_NAME)
-        target.write_text(text, encoding="utf-8")
+        return text.replace("__ROOT_ENV_NAME__", ROOT_ENV_NAME)
+
+    return _copy_skill_tree(templates, destination, transform=_render)
+
+# Top-level reference files shipped before references/ existed. They are
+# removed from an installed skill directory only when the bundled template no
+# longer contains them, so an upgrade never leaves two diverging copies.
+_LEGACY_SKILL_FILES = ("ref-enrichment.md", "ref-operations.md", "ref-protocol.md", "ref-templates.md")
+_SKILL_REFERENCE_PATTERN = re.compile(r"(?<![\w/.-])((?:references|scripts|assets)/[\w./-]+\.\w+)")
+
+
+def _skill_template_files(templates: Path) -> list[Path]:
+    """Every installable file under a skill template, sub-folders included."""
+    if not templates.is_dir():
+        return []
+    # Once references/ exists, top-level legacy ref-*.md copies left in a source
+    # checkout are superseded and must never be installed again.
+    skip_legacy = (templates / "references").is_dir()
+    # Sort by POSIX relative path: Windows Path ordering is case-insensitive.
+    return sorted(
+        (
+            path for path in templates.rglob("*")
+            if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
+            and not (skip_legacy and path.parent == templates and path.name in _LEGACY_SKILL_FILES)
+        ),
+        key=lambda path: path.relative_to(templates).as_posix(),
+    )
+
+
+def _copy_skill_tree(templates: Path, destination: Path, *, transform=None) -> list[str]:
+    """Copy a skill template tree, preserving sub-folders such as references/.
+
+    Returns the copied paths relative to the skill directory (POSIX form).
+    """
+    destination.mkdir(parents=True, exist_ok=True)
+    copied: list[str] = []
+    sources = _skill_template_files(templates)
+    for source in sources:
+        relative = source.relative_to(templates)
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if transform is not None and source.suffix == ".md":
+            target.write_text(transform(source.read_text(encoding="utf-8")), encoding="utf-8")
+        else:
+            shutil.copy2(source, target)
+        copied.append(relative.as_posix())
+    for legacy in _LEGACY_SKILL_FILES:
+        stale = destination / legacy
+        if stale.is_file() and legacy not in copied:
+            stale.unlink()
+    return copied
+
+
+def _missing_skill_references(skill_dir: Path) -> list[str]:
+    """Relative files that an installed SKILL.md tells the agent to read but are absent."""
+    skill_file = skill_dir / "SKILL.md"
+    if not skill_file.is_file():
+        return ["SKILL.md"]
+    text = skill_file.read_text(encoding="utf-8")
+    referenced = sorted(set(_SKILL_REFERENCE_PATTERN.findall(text)))
+    return [item for item in referenced if not (skill_dir / item).is_file()]
+
 
 # ── i18n message table ────────────────────────────────────
 
@@ -98,7 +155,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "upgrade_skill_file_ok": "  [ok] {}",
         "upgrade_skill_done": "\nSkills upgraded to version {}",
         "upgrade_skill_no_templates": "Error: skill_templates directory not found.",
-        "upgrade_skill_no_files": "Error: No .md files found in skill_templates.",
+        "upgrade_skill_no_files": "Error: SKILL.md not found in skill_templates.",
         "destroy_wiki_path": "Wiki path: {}",
         "path_not_found_msg": "No path found within max depth {}",
         "path_not_found_hint": "Try increasing --max-depth",
@@ -125,7 +182,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "upgrade_skill_file_ok": "  [ok] {}",
         "upgrade_skill_done": "\n스킬이 버전 {}로 업그레이드되었습니다",
         "upgrade_skill_no_templates": "오류: skill_templates 디렉토리를 찾을 수 없습니다.",
-        "upgrade_skill_no_files": "오류: skill_templates에서 .md 파일을 찾을 수 없습니다.",
+        "upgrade_skill_no_files": "오류: skill_templates에서 SKILL.md를 찾을 수 없습니다.",
         "destroy_wiki_path": "위키 경로: {}",
         "path_not_found_msg": "최대 깊이 {} 내에서 경로를 찾지 못했습니다",
         "path_not_found_hint": "--max-depth를 늘려보세요",
@@ -347,9 +404,9 @@ def _install_skills_for_agents(agents: "list[str]", skill_name: str, skill_files
         if agent == "gemini":
             destinations.append(_LEGACY_AGENT_SKILL_PATHS["gemini"][0](skill_name))
         for skill_dir in destinations:
-            skill_dir.mkdir(parents=True, exist_ok=True)
-            for src in skill_files:
-                shutil.copy2(src, skill_dir / src.name)
+            if skill_files:
+                # Copy the whole template tree so SKILL.md's references/ exist.
+                _copy_skill_tree(_skill_templates_dir(), skill_dir)
             installed_dirs.append(str(skill_dir))
         mission_templates = _mission_skill_templates_dir()
         if mission_templates.exists():
@@ -359,11 +416,7 @@ def _install_skills_for_agents(agents: "list[str]", skill_name: str, skill_files
                     _LEGACY_AGENT_SKILL_PATHS["gemini"][0](f"{skill_name}-missions")
                 )
             for mission_dir in mission_destinations:
-                mission_dir.mkdir(parents=True, exist_ok=True)
-                for src in mission_templates.rglob("*.md"):
-                    destination = mission_dir / src.relative_to(mission_templates)
-                    destination.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(src, destination)
+                _copy_skill_tree(mission_templates, mission_dir)
                 installed_dirs.append(str(mission_dir))
         research_destinations = [path_fn(f"{skill_name}-deep-research")]
         if agent == "gemini":
@@ -414,6 +467,7 @@ def _create_seed_document(wiki_root: "Path", lang: str) -> bool:
     os.environ["AI_WIKI_ROOT"] = str(wiki_root)
     try:
         from ai_wiki import __version__
+        from ai_wiki.agent_protocol import PROTOCOL_VERSION
 
         now_text = utc_now_text()
         uses_placeholders = "__WIKI_DISPLAY_NAME__" in seed_text
@@ -422,6 +476,7 @@ def _create_seed_document(wiki_root: "Path", lang: str) -> bool:
             .replace("__WIKI_DISPLAY_NAME__", DISPLAY_NAME)
             .replace("__WIKI_COMMAND_NAME__", COMMAND_NAME)
             .replace("__ENGINE_VERSION__", __version__)
+            .replace("__PROTOCOL_VERSION__", PROTOCOL_VERSION)
             .replace("__NOW__", now_text)
         )
         if not uses_placeholders and DISPLAY_NAME != "AI Wiki":
@@ -583,7 +638,7 @@ def init(ctx, path):
 
     # Copy skill files — install only to selected agent paths
     _skill_templates = _skill_templates_dir()
-    _skill_files = list(_skill_templates.glob("*.md")) if _skill_templates.exists() else []
+    _skill_files = _skill_template_files(_skill_templates)
 
     installed_skill_dirs: list[str] = []
     if _skill_files:
@@ -4225,8 +4280,8 @@ def upgrade_skill(requested_agents):
         click.echo(msg("upgrade_skill_no_templates"), err=True)
         sys.exit(1)
 
-    skill_files = list(templates_dir.glob("*.md"))
-    if not skill_files:
+    skill_files = _skill_template_files(templates_dir)
+    if not (templates_dir / "SKILL.md").is_file():
         click.echo(msg("upgrade_skill_no_files"), err=True)
         sys.exit(1)
 
@@ -4264,11 +4319,7 @@ def upgrade_skill(requested_agents):
         if agent == "gemini":
             destinations.append(_LEGACY_AGENT_SKILL_PATHS["gemini"][0](wiki_name))
         for dest_dir in destinations:
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            copied = []
-            for src in skill_files:
-                shutil.copy2(src, dest_dir / src.name)
-                copied.append(src.name)
+            copied = _copy_skill_tree(templates_dir, dest_dir)
             label = _AGENT_DISPLAY.get(agent, agent)
             click.echo(msg("upgrade_skill_copied", len(copied), dest_dir, label))
             for fname in sorted(copied):
@@ -4281,13 +4332,7 @@ def upgrade_skill(requested_agents):
                     _LEGACY_AGENT_SKILL_PATHS["gemini"][0](f"{wiki_name}-missions")
                 )
             for mission_dir in mission_destinations:
-                mission_dir.mkdir(parents=True, exist_ok=True)
-                copied = []
-                for src in mission_templates.rglob("*.md"):
-                    destination = mission_dir / src.relative_to(mission_templates)
-                    destination.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(src, destination)
-                    copied.append(str(src.relative_to(mission_templates)))
+                copied = _copy_skill_tree(mission_templates, mission_dir)
                 label = _AGENT_DISPLAY.get(agent, agent)
                 click.echo(msg("upgrade_skill_copied", len(copied), mission_dir, label))
                 for fname in sorted(copied):
@@ -4298,28 +4343,48 @@ def upgrade_skill(requested_agents):
                 _LEGACY_AGENT_SKILL_PATHS["gemini"][0](f"{wiki_name}-deep-research")
             )
         for research_dir in research_destinations:
-            _install_deep_research_skill(research_dir, skill_name=wiki_name)
-            click.echo(msg("upgrade_skill_copied", 1, research_dir, _AGENT_DISPLAY.get(agent, agent)))
-            click.echo(msg("upgrade_skill_file_ok", "SKILL.md"))
+            copied = _install_deep_research_skill(research_dir, skill_name=wiki_name)
+            click.echo(msg("upgrade_skill_copied", len(copied), research_dir, _AGENT_DISPLAY.get(agent, agent)))
+            for fname in sorted(copied):
+                click.echo(msg("upgrade_skill_file_ok", fname))
 
     # A successful copy is not enough: expose deterministic version/hash
     # evidence, but never terminate a possibly active local server for users.
+    # Every installed skill (primary, missions, deep-research) must contain
+    # each file that its SKILL.md instructs the agent to read.
     verification = []
+    reference_checks = []
+    mission_templates = _mission_skill_templates_dir()
     for agent in agents:
         path_fn = _AGENT_SKILL_PATHS.get(agent)
-        if path_fn is not None:
-            verification.append(
-                _skill_file_integrity(templates_dir / "SKILL.md", path_fn(wiki_name) / "SKILL.md")
-            )
+        if path_fn is None:
+            continue
+        primary_dir = path_fn(wiki_name)
+        verification.append(_skill_file_integrity(templates_dir / "SKILL.md", primary_dir / "SKILL.md"))
+        for template in skill_files:
+            relative = template.relative_to(templates_dir)
+            if relative.as_posix() != "SKILL.md":
+                verification.append(_skill_file_integrity(template, primary_dir / relative))
+        skill_dirs = [primary_dir]
+        if mission_templates.exists():
+            skill_dirs.append(path_fn(f"{wiki_name}-missions"))
+        if _deep_research_skill_templates_dir().exists():
+            skill_dirs.append(path_fn(f"{wiki_name}-deep-research"))
+        for skill_dir in skill_dirs:
+            missing = _missing_skill_references(skill_dir)
+            reference_checks.append({"path": str(skill_dir), "missing": missing, "ok": not missing})
     failed = [item for item in verification if not item["matches"]]
+    failed += [item for item in reference_checks if not item["ok"]]
     click.echo(json.dumps({
         "skill_upgrade_verification": verification,
+        "skill_reference_verification": reference_checks,
         "process_policy": "no_process_is_terminated_automatically",
         "active_ai_wiki_processes": _active_wiki_processes(),
     }, ensure_ascii=False))
     if failed:
         raise click.ClickException(
-            "skill upgrade verification failed; inspect the reported path, hash, version, and file lock"
+            "skill upgrade verification failed; inspect the reported path, hash, version, "
+            "missing reference files, and file lock"
         )
 
     version_str = pkg_ver or "unknown"

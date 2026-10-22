@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.1 - 2026-10-22
+
+- Fix `upgrade-skill` and `init` copying only top-level `*.md` files: the whole skill template tree (including `references/`) is now installed, so variant skills such as tax/law/labor/business-wiki receive `references/domain-checklist.ko.md`.
+- Verify after `upgrade-skill` that every file each installed SKILL.md tells the agent to read (`references/...`) exists, for the primary, Missions, and Deep Research skills; the upgrade fails with the missing paths otherwise. Integrity hashes now cover every template file, not only SKILL.md.
+- Move the four unlinked `ref-*.md` files into `skill_templates/references/` (`templates`, `enrichment`, `protocol`, `operations`) and state in SKILL.md exactly when to read each one. Stale top-level `ref-*.md` copies are removed on upgrade.
+- Rewrite the enrichment guide to the versioned patch flow (`get` → `patch --if-version --dry-run` → `patch`) instead of the legacy `update --content-file`.
+- Restore routing guidance in the ai-wiki skill description: dedicated wikis (tax/labor/law/business-wiki and other variants) take priority, and Korean trigger keywords (조사, 개념, 기술, 일반 지식 …) are included. Missions and Deep Research descriptions gain Korean triggers too.
+- Add the missing `mission_skill_templates/references/mission-examples.ko.md` that the generic Missions skill already referenced.
+- Keep `search`/`context` stdout pure JSON: when the embedding model is already cached, it loads with `HF_HUB_OFFLINE=1` (an explicit user setting wins; offline failure retries online once); Hugging Face/transformers warnings and progress bars are suppressed and any library output is redirected to stderr. Set `AI_WIKI_MODEL_VERBOSE=1` to see them.
+
 ## 1.2.0 - 2026-07-13
 
 - Add Mission Control's compact command-center projections: agents can retrieve the next actionable task with its pinned plan, dependencies, criteria, evidence summary, lease, blocker, and handoff state without loading the full audit ledger.

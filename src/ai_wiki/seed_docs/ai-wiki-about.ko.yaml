@@ -6,14 +6,25 @@ tags:
   - __WIKI_COMMAND_NAME__
   - self-reference
   - AI-first
+  - multi-agent
   - knowledge-base
-  - knowledge-graph
+  - knowledge-ledger
+  - execution-ledger
   - YAML
   - JSON-protocol
   - hybrid-search
+  - chunk-retrieval
   - vector-search
   - citation
   - RFC-6902
+  - optimistic-concurrency
+  - temporal-knowledge
+  - missions
+  - deep-research
+  - claim-ledger
+  - retrieval-calibration
+  - read-only-connectors
+  - skill-routing
   - local-first
 metadata:
   confidence: 0.97
@@ -37,6 +48,30 @@ sources:
     url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/models.py
     title: AI Wiki schema v2 document model
     retrieved_at: "__NOW__"
+  - id: src-schema-v3
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/schema_v3.py
+    title: AI Wiki schema v3 temporal extension
+    retrieved_at: "__NOW__"
+  - id: src-missions
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/docs/MISSIONS.md
+    title: AI Wiki Missions guide
+    retrieved_at: "__NOW__"
+  - id: src-deep-research
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/deep_research_skill_templates/SKILL.md
+    title: AI Wiki Deep Research skill protocol
+    retrieved_at: "__NOW__"
+  - id: src-calibration
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/calibration.py
+    title: AI Wiki retrieval calibration implementation
+    retrieved_at: "__NOW__"
+  - id: src-connectors
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/connectors.py
+    title: AI Wiki read-only connector implementation
+    retrieved_at: "__NOW__"
+  - id: src-policy
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/policy.py
+    title: AI Wiki local policy and namespace rules
+    retrieved_at: "__NOW__"
   - id: src-variants
     url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/docs/VARIANTS.md
     title: Purpose-specific wiki guide
@@ -44,6 +79,14 @@ sources:
   - id: src-release
     url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/docs/RELEASE.ko.md
     title: AI Wiki release workflow
+    retrieved_at: "__NOW__"
+  - id: src-skill-identity
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/docs/SKILL_IDENTITY_CONTRACT.ko.md
+    title: AI Wiki skill identity and alias contract
+    retrieved_at: "__NOW__"
+  - id: src-changelog
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/CHANGELOG.md
+    title: AI Wiki changelog
     retrieved_at: "__NOW__"
   - id: src-pypi
     url: https://pypi.org/project/ai-wiki/__ENGINE_VERSION__/
@@ -54,66 +97,90 @@ content:
   type: technology
   data:
     what: >-
-      __WIKI_DISPLAY_NAME__는 AI 에이전트가 세션과 프로젝트를 넘어 재사용할 지식을 검색하고,
-      근거와 함께 읽고, 검증된 부분 수정이나 신규 생성을 수행하도록 설계된 로컬 우선 구조화
-      백과사전이다. 표준 명령은 __WIKI_COMMAND_NAME__이다.
+      __WIKI_DISPLAY_NAME__는 Codex·Claude·Gemini 같은 외부 AI 에이전트가 세션과 프로젝트를
+      넘어 하나의 로컬 지식 원본을 공유하고, 근거 기반 검색·안전한 수정·장기 작업 인계를
+      수행하도록 돕는 구조화 지식 및 실행 원장이다. 표준 명령은 __WIKI_COMMAND_NAME__이다.
     summary: >-
-      YAML 원본, FTS5·벡터·관계 검색, 근거 인용, 안전한 부분 수정과 목적별 격리를 제공한다.
-      외부 AI 에이전트가 추론하고 웹 UI는 인간 검토를 보조한다.
+      YAML 문서를 영속적 원본으로 삼고 JSON Pointer 청크 검색, 정확한 인용과 낙관적 동시성
+      패치로 여러 에이전트의 지식 재사용을 안전하게 만든다. 시간축 지식은 사실의 유효 시점과
+      충돌을 보존하고, Missions는 계획·작업·증거·검토·인계를 기록하며, Deep Research는
+      claim ledger에 근거를 연결한다. 공식 운영 경계는 외부에 공개하지 않는 로컬 단일 사용자다.
     facts:
-      - "공용 엔진은 PyPI ai-wiki __ENGINE_VERSION__이며 AI 명령의 통신 규칙 버전은 1.5이다."
+      - "공용 엔진은 PyPI ai-wiki __ENGINE_VERSION__이며 AI 명령 프로토콜은 __PROTOCOL_VERSION__이다."
       - "모든 핵심 AI 응답은 protocol_version, status, data, meta, error 필드를 갖는다."
       - "YAML 문서가 영속적 원본이고 SQLite wiki.db와 vectors.db는 파생 검색 인덱스다."
       - "기본 검색은 문서 FTS5, 한국어 trigram 청크 FTS, multilingual E5 및 sqlite-vec 청크 의미 검색을 RRF로 결합한다."
-      - "context는 검색 후보와 관계 문서를 결합해 기본 4000 estimated token 예산 안에서 반환한다."
+      - "context는 기본 4000 estimated token, 문서 한도 8 안에서 default·knowledge·missions·all 범위를 검색한다."
       - "인용은 doc:<문서ID>#<JSON Pointer> 형식으로 특정 데이터 경로를 가리킨다."
-      - "patch는 RFC 6902 일부 연산과 if-version 낙관적 동시성 제어를 사용한다."
-      - "기존 v1 문서는 조회 시 내부 v2로 정규화되고 수정된 문서만 v2로 저장된다."
+      - "record-use와 독립 record-feedback은 실제 사용과 accepted·rejected·corrected 판단을 검색 보정 자료로 남긴다."
+      - "patch는 RFC 6902 일부 연산, dry-run과 if-version 낙관적 동시성 제어를 사용한다."
+      - "기존 v1·v2 문서는 읽기만으로 바뀌지 않고 시간축 사실을 쓰는 문서만 schema v3로 점진 전환된다."
+      - "schema v3는 entities, evidence, events, claims, transitions로 사실의 유효 시점과 정정·충돌 계보를 보존한다."
+      - "Missions는 작업 실행기가 아니라 승인된 계획 revision, task lease, 증거, 독립 검토와 handoff를 보존하는 실행 원장이다."
+      - "Mission의 summary, next, task context, evidence는 다음 행동에 필요한 최소 완전 컨텍스트를 제공한다."
+      - "Deep Research는 범위와 claim ledger를 먼저 만들고 지속 저장 요청이 없으면 읽기 전용으로 조사한다."
+      - "기본 AI Wiki, Missions, Deep Research의 세 스킬은 같은 버전 묶음으로 설치·업그레이드·감사한다."
       - "목적별 위키는 공용 엔진을 공유하지만 문서, DB, 벡터 인덱스, 명령과 스킬을 격리한다."
-      - "웹 UI에는 인증과 권한 관리가 없으므로 로컬 사용만 전제한다."
+      - "커넥터는 외부 서비스를 수정하지 않는 read-only 수집 경계이며 원문, 출처와 권한 정보를 보존한다."
+      - "검색 calibration은 독립 holdout, 개선 임계값, cooldown, promote와 rollback을 사용한다."
+      - "공식 운영 프로필은 trusted-local 로컬 단일 사용자이며 계정·로그인·공개 네트워크 배포는 안내 범위가 아니다."
     mission:
-      primary: AI가 지식을 검색하고 근거를 추적하며 안전하게 축적하고 다시 활용하는 백과사전을 제공한다.
-      secondary: 인간이 문서, 출처, 검증 상태, 변경 이력과 사용 기록을 검토하게 한다.
-      non_goal: AI Wiki 내부 모델이 최종 추론이나 답변 생성을 수행하는 것은 목표가 아니다.
+      primary: 여러 외부 AI 에이전트가 하나의 근거 연결 지식 원본을 검색·수정·재사용하고 장기 작업을 안전하게 인계하게 한다.
+      secondary: 인간이 문서, 출처, 시간축 주장, 사용·평가 기록, Mission 증거와 검토 결과를 감사하게 한다.
+      non_goal: AI Wiki 자체가 최종 추론 모델, 자율 작업 실행기, 공개 협업 서비스 또는 비밀 저장소가 되는 것은 목표가 아니다.
     design_principles:
       - "AI 우선: 사람용 화면보다 AI가 안정적으로 읽을 수 있는 CLI JSON 규칙을 우선한다."
       - "근거 연결: 지식은 문서 ID, JSON Pointer, 출처와 검증 수준으로 추적한다."
+      - "공유하되 통제: 여러 에이전트가 같은 원본을 쓰되 revision, lease, 승인과 독립 검토로 충돌을 통제한다."
       - "내 컴퓨터 우선: 지식은 사용자의 파일 시스템에 저장한다."
       - "구조화된 기준 원본: YAML 원본과 검색용 색인의 역할을 분리한다."
       - "안전한 자율 작업: AI가 문서를 쓸 때 문서 구조, 버전 충돌, 보호 항목과 품질 규칙을 검사한다."
       - "위키별 완전 분리: 목적이 다른 위키의 문서, 색인과 사용 기록을 섞지 않는다."
       - "단계적 개선: 기존 문서를 한꺼번에 바꾸지 않고 수정되는 문서부터 새 구조로 전환한다."
+      - "시간축 충실성: 현재 답으로 덮어쓰지 않고 사실의 유효 시점, 기록 시점과 정정 계보를 보존한다."
+      - "점진적 공개: 답변과 다음 작업에는 최소 완전 컨텍스트를 주고 전체 원장은 감사할 때만 펼친다."
     architecture:
-      durable_storage: articles/<category>/<subcategory>/<slug>.yaml의 schema v2 YAML
-      metadata_index: data/wiki.db의 SQLite 메타데이터와 FTS5 전문 검색
-      vector_index: data/vectors.db의 JSON 경로별 sqlite-vec 청크 임베딩과 벡터 메타데이터
+      durable_knowledge: articles/<category>/<subcategory>/<slug>.yaml의 schema v2 문서와 선택적 schema v3 temporal extension
+      mission_ledger: missions 아래 ResearchReport·WorkPlan·WorkRun·KnowledgeCandidate YAML 원장
+      metadata_index: data/wiki.db의 메타데이터, 관계, 사용·평가 기록, 문서 FTS와 trigram 청크 FTS
+      vector_index: data/vectors.db의 sqlite-vec 청크 임베딩과 모델·차원·revision 메타데이터
       source_archive: sources 디렉터리에 보관되는 수집 원문
       operation_history: logs와 Git 자동 커밋에 남는 작업 이력
-      agent_interface: "__WIKI_COMMAND_NAME__ CLI와 통신 규칙 1.5 JSON 응답"
-      human_interface: Flask 기반 로컬 웹 UI의 문서, 목록, 그래프와 검토 화면
-      shared_engine: PyPI ai-wiki 공용 엔진과 목적별 얇은 독립 패키지
+      agent_interface: "__WIKI_COMMAND_NAME__ CLI와 프로토콜 __PROTOCOL_VERSION__ JSON 응답"
+      human_interface: Flask 로컬 UI의 문서·그래프·시간축·검토·Mission command-center 화면
+      policy_layer: principal·role·namespace·secret reference·redaction·audit 경계를 가진 trusted-local 정책
+      extension_layer: read-only connector와 선택적 plugin backend
+      shared_engine: PyPI ai-wiki 공용 엔진, 3종 스킬 번들과 목적별 독립 패키지
     ai_workflow:
       - capabilities로 프로토콜, 명령, 스키마와 제한을 확인한다.
       - context로 토큰 예산 내 근거 연결 컨텍스트를 검색한다.
       - documents와 citations를 사용해 답변하고 citation key를 유지한다.
       - record-use에 answered 또는 insufficient와 실제 사용 citation을 기록한다.
+      - 독립 검토가 있으면 record-feedback에 accepted, rejected 또는 corrected 판단과 근거를 남긴다.
       - 정보가 부족하면 권위 있는 외부 자료를 조사한다.
+      - 심층 조사에서는 범위, 기준 시점, 출처 유형, 중단 조건과 claim ledger를 먼저 만든다.
       - 기존 문서는 get, dry-run patch, if-version patch 순서로 보강한다.
       - 새 문서는 dry-run create 후 생성하고 duplicate_conflict를 명시적으로 해소한다.
+      - 장기 작업은 ResearchReport와 WorkPlan을 승인한 뒤 WorkRun의 lease·증거·독립 검토·handoff를 기록한다.
       - 저장 후 context를 다시 실행해 검색 결과와 citation 경로를 검증한다.
     protocol_contract:
+      current: "프로토콜 __PROTOCOL_VERSION__, 호환 범위 1.1~1.5"
       success: status가 ok이고 data에 결과가 있으며 error는 null이다.
       failure: status가 error이고 data는 null이며 error에 code, message, retryable, details가 포함된다.
       read_views: get은 compact, full, raw를 제공하며 기본값은 compact다.
       field_projection: get --fields는 필요한 필드만 선택해 컨텍스트 소비를 줄인다.
+      context_defaults: 기본 max_tokens 4000, limit 8이며 default·knowledge·missions·all scope를 지원한다.
+      namespaces: knowledge, plans, runs, artifacts, external_evidence를 구분한다.
       token_estimation: 직렬화된 UTF-8 JSON 바이트 길이에 기반한 보수 추정기를 사용한다.
     retrieval_pipeline:
-      candidate_generation: 하이브리드 검색에서 최대 20개 후보를 구한다.
-      fusion: FTS5 키워드 순위와 벡터 의미 순위를 Reciprocal Rank Fusion으로 결합한다.
+      candidate_generation: 문서 FTS, trigram 청크 FTS와 E5 청크 벡터 검색에서 후보를 구한다.
+      fusion: 키워드와 의미 검색 순위를 Reciprocal Rank Fusion으로 결합한다.
+      chunk_identity: 결정적인 청크 ID와 JSON Pointer가 증분 색인과 정확한 인용을 지원한다.
       relation_expansion: 상위 후보의 관련 문서를 추가해 연결 지식을 보완한다.
       filtering: pending 미검증 초안은 기본 context에서 제외한다.
       compaction: 제목, 요약, 사실, 한계, confidence, 버전, 출처와 citation을 우선한다.
       budgeting: 값을 자르지 않고 예산을 넘는 낮은 우선순위 문서 전체를 제외한다.
+      trust_loop: record-use와 독립 record-feedback을 holdout calibration에 사용하고 개선된 후보만 promote한다.
     document_model:
       identity: id, title, category, tags가 식별과 분류를 담당한다.
       metadata: confidence, document_version, 시각, 작성자, maturity와 completeness를 저장한다.
@@ -121,6 +188,7 @@ content:
       relations: target_id, 유형, 방향, 가중치와 근거 source id를 가진다.
       content: 등록된 content type과 구조화 data를 분리한다.
       verification: JSON Pointer 경로별 검증 수준, 출처와 검증 시각을 저장한다.
+      temporal_extension: schema v3는 entity 중심으로 evidence, event, claim과 transition을 연결한다.
       history: 변경 작업을 사용자 지식 본문과 분리해 기록한다.
       extensions: 핵심 스키마를 오염시키지 않고 목적별 확장을 수용한다.
     write_safety:
@@ -129,62 +197,119 @@ content:
       - test 실패, 잘못된 경로, 보호 필드 수정과 허용되지 않은 연산을 거부한다.
       - 임시 파일과 원자적 교체를 사용하고 YAML, SQLite와 벡터 인덱스를 동기화한다.
       - 출처 참조, 관계 대상, 날짜와 필드 타입을 검증한다.
+      - temporal entity·event 참조와 Mission plan revision·lease·의존성·resource lock을 검증한다.
       - 삭제는 AI 자율 작업에서 제외하고 사용자의 명시적 요청과 confirm을 요구한다.
     verification_policy:
       levels: [unverified, sourced, verified, corroborated, disputed, human_verified]
       source_free_rule: 출처 없는 지식은 confidence 0.5 이하의 pending 미검증 초안으로만 자율 저장한다.
       normal_retrieval: pending 초안은 기본 context에서 제외된다.
       citation_integrity: 현재 context가 발급하지 않은 citation은 record-use에서 거부된다.
+      temporal_conflict: 상충하는 주장은 삭제하지 않고 disputed 또는 transition으로 근거와 함께 보존한다.
+      mission_evidence: 완료 기준별 evidence와 독립 검토가 없으면 완료 처리를 거부한다.
+      calibration_evidence: 단순 클릭과 AI 자기 평가는 검색 설정 승격 근거로 사용하지 않는다.
       quality_dimensions: 구조, 내용량, 출처, 태그, 관계, confidence와 검증률을 종합한다.
+    mission_ledger:
+      purpose: 긴 작업을 자동 실행하는 대신 누구나 이어받을 수 있는 증거 기반 상태 원장을 제공한다.
+      flow: [ResearchReport, WorkPlan, approval, WorkRun, task lease, evidence, independent review, KnowledgeCandidate]
+      compact_reads: [run summary, run next, task context, run evidence]
+      full_audit: run status --full은 전체 원장 감사가 필요할 때만 사용한다.
+      boundary: 실제 추론, 코딩과 외부 도구 실행은 Codex나 Gemini 같은 에이전트가 담당한다.
+    temporal_knowledge:
+      model: entity-first event-sourced knowledge extension
+      time_axes: [valid_time, recorded_at, event_time]
+      objects: [entities, evidence, events, claims, transitions]
+      views: [current, as-of, known-as-of, timeline, why-changed, disputed]
+      rule: 과거 주장을 덮어쓰기보다 정정·대체·반박 계보를 기록한다.
+    deep_research:
+      purpose: 구현이나 의사결정 전에 재현 가능한 근거 중심 조사 결과를 만든다.
+      planning: [조사 질문과 범위, 제외 범위, 기준 시점, 선호 출처 유형, 중단 조건]
+      claim_ledger_states: [supported, contested, insufficient, out_of_scope]
+      method: 로컬 지식을 먼저 읽고 외부 1차 자료를 보충하며 상충 근거와 미해결 질문을 함께 비교한다.
+      write_boundary: 기본은 읽기 전용이며 사용자가 지속 저장을 명시적으로 요청할 때만 기록한다.
+    retrieval_trust:
+      signals: record-use는 사용 사실, record-feedback은 독립 정확성 판단을 기록한다.
+      calibration: 충분한 holdout 평가가 있고 baseline보다 개선된 경우에만 후보 설정을 promote한다.
+      safeguards: [최소 표본, 독립 평가, cooldown, promotion history, rollback]
+    connectors_and_plugins:
+      connectors: 외부 자료를 read-only로 snapshot하여 sources에 provenance와 permissions를 남긴다.
+      secrets: token 원문 대신 env:<환경변수명> 참조를 사용한다.
+      plugins: 선택적 backend를 발견하고 실패 시 degraded 상태와 원인을 명시한다.
+    skill_identity:
+      bundle: [ai-wiki, ai-wiki-missions, ai-wiki-deep-research]
+      identity_fields: [skill_name, aliases, command_name, env_prefix]
+      upgrade: upgrade-skill은 세 스킬을 같은 릴리스 버전으로 갱신한다.
+      audit: variant audit-skills는 이름, 라우팅과 리소스 hash를 검사한다.
     purpose_specific_wikis:
       reason: 목적과 보안 경계가 다른 지식을 한 루트에 섞지 않기 위해 사용한다.
-      presets: [general, law, labor, tax, business, research, personal]
-      custom_manifest: 기본 범주 밖의 위키는 이름, 도메인, 명령, 설명과 trigger를 정의한 manifest로 만든다.
-      isolation: 각 패키지는 독립된 YAML, SQLite DB, 벡터 DB, 웹 포트와 스킬을 사용한다.
+      presets: [general, law, labor, tax, business, corporate, research, personal, tech]
+      custom_manifest: 기본 범주 밖의 위키는 skill_name, aliases, command_name, env_prefix, 도메인과 trigger를 정의한다.
+      isolation: 각 패키지는 독립된 YAML, SQLite DB, 벡터 DB, 웹 포트와 3종 스킬을 사용한다.
       lifecycle: 설치, 백업, 복원, 업그레이드, 마이그레이션, 격리와 스킬 라우팅 감사를 지원한다.
     agent_integrations:
-      codex: 사용자 SKILL.md를 통해 JSON 프로토콜을 실행한다.
-      gemini: Antigravity CLI의 Gemini 스킬에서 동일한 프로토콜을 사용한다.
+      codex: 사용자 SKILL.md를 통해 지식, Mission과 Deep Research 워크플로를 실행한다.
+      gemini: Antigravity CLI의 Gemini 스킬에서 같은 프로토콜과 스킬 번들을 사용한다.
       claude: Claude Code 스킬 형식을 지원한다.
-      shared_rule: 에이전트와 무관하게 capabilities, context, citation, record-use, patch 또는 create 순서를 공유한다.
+      shared_rule: 에이전트와 무관하게 capabilities, context, citation, record-use와 안전한 writeback 순서를 공유한다.
+      execution_boundary: 실제 추론과 외부 도구 실행은 에이전트가 담당하고 AI Wiki는 컨텍스트와 원장을 제공한다.
     human_role:
       - AI가 생성한 지식을 읽고 검토한다.
       - 검증 대기 문서와 출처, confidence, maturity를 확인한다.
       - 관계 그래프, 변경 이력과 실제 사용 기록을 감사한다.
+      - 시간축 주장, 검색 피드백, Mission 증거와 독립 검토 결과를 확인한다.
       - 고위험 판단이나 삭제처럼 AI 자율 범위 밖 작업을 명시적으로 승인한다.
       - 웹 UI는 AI 프로토콜의 대체물이 아니라 검토용 보조 인터페이스다.
     current_release:
       engine_version: __ENGINE_VERSION__
-      protocol_version: "1.5"
+      protocol_version: "__PROTOCOL_VERSION__"
+      compatible_protocol_versions: ["1.1", "1.2", "1.3", "1.4", "1.5"]
       distribution: [GitHub, PyPI]
-      install_command: pip install ai-wiki
+      install_command: "pip install ai-wiki==__ENGINE_VERSION__"
       wiki_command: __WIKI_COMMAND_NAME__
+      operating_profile: local-single-user
+      skill_bundle: [ai-wiki, ai-wiki-missions, ai-wiki-deep-research]
+      headline_changes: [Mission compact reads, 한국어·영어 Mission 화면, Deep Research, 3종 스킬 공동 버전·감사]
       local_vector_requirement: 문서 수와 벡터 문서 수가 일치하고 청크 FTS와 벡터 청크 수가 준비되어야 한다.
     use_cases:
       - 반복 조사한 지식과 오류 해결 방법의 세션 간 재사용
       - 출처와 검증 경로가 필요한 연구 축적
       - 여러 AI 에이전트의 로컬 근거 저장소 공유
+      - 시간에 따라 바뀌는 사실의 현재 상태와 정정 계보 조회
+      - 승인된 장기 계획을 증거와 인계 정보로 이어서 수행
       - 목적별 독립 위키를 통한 업무 영역과 민감 정보 격리
     limitations:
-      - 인증과 권한 관리가 없어 외부 네트워크에 공개하면 안 된다.
+      - 공식 운영 범위는 로컬 단일 사용자이며 공개 다중 사용자 서비스가 아니다.
+      - 웹 서버와 위키 루트를 외부 네트워크에 공개하면 안 된다.
       - 로컬 문서와 데이터베이스는 기본적으로 암호화되지 않는다.
-      - 최종 답변 정확성은 에이전트 추론과 입력 출처 품질에도 의존한다.
+      - 최종 답변과 작업 실행 정확성은 외부 에이전트와 입력 출처 품질에도 의존한다.
+      - Missions는 실행 원장이지 스케줄러나 durable workflow runtime이 아니다.
+      - Deep Research는 출처 신뢰성을 자동 보증하지 않는다.
       - 최초 벡터 모델 준비에는 다운로드와 추가 디스크 공간이 필요할 수 있다.
+      - calibration은 충분한 독립 평가가 모이기 전까지 uncalibrated일 수 있다.
       - 오래된 지식은 재검증해야 한다.
     best_practices:
       - 답변 전 context를 실행하고 반환된 citation만 사용한다.
       - 안정적인 핵심 지식과 자주 변하는 시계열 정보를 분리한다.
+      - 시간축 문서는 entity를 먼저 식별하고 event, evidence, claim과 transition을 연결한다.
       - 출처를 주장 경로와 verification source_ids로 연결한다.
       - 부분 수정은 get, dry-run patch, if-version patch 순서로 수행한다.
       - doctor에서 문서 수와 벡터 수 일치 및 vector.ready를 확인한다.
+      - Mission은 run next와 task context로 revision·lease·handoff를 확인하고 기준별 evidence를 제출한다.
+      - Deep Research는 범위와 claim ledger를 먼저 만들며 지속 저장은 명시적 요청 후에만 한다.
     when_to_use:
       - 여러 세션과 프로젝트에서 반복 사용할 지식이 있을 때
       - AI가 근거와 문서 버전을 추적하면서 지식을 부분 갱신해야 할 때
+      - 장기 작업의 승인된 계획, 완료 기준, 증거와 인계를 세션 밖에 보존해야 할 때
       - 로컬에서 통제 가능한 AI용 백과사전과 의미 검색이 필요할 때
     when_not_to_use:
       - 인증, 권한과 암호화가 필요한 공개 다중 사용자 서비스의 직접 백엔드
+      - 작업 자체를 대신 실행하고 재시도하는 durable workflow engine이 필요할 때
       - 재사용 가치가 전혀 없는 일회성 임시 대화
       - 출처 검증 없이 확정 사실로 배포해야 하는 고위험 자동 의사결정
+    identity_handling:
+      reason: 명령 예시의 <문서ID>와 <환경변수명>은 실제 개인 익명화가 아니라 입력 자리표시자다.
+      scope: seed 문서의 명령·형식 예시
+      source_disclosure_status: not_applicable_no_personal_identity
+      preserved_attributes: [명령 인자의 역할, 입력 형식, 실행 순서]
 verification:
   - path: /content/data/what
     level: verified
@@ -193,12 +318,12 @@ verification:
     note: 공식 목적과 대조
   - path: /content/data/facts
     level: corroborated
-    source_ids: [src-readme, src-protocol, src-model, src-variants, src-pypi]
+    source_ids: [src-readme, src-protocol, src-model, src-schema-v3, src-missions, src-deep-research, src-calibration, src-connectors, src-policy, src-variants, src-changelog, src-pypi]
     verified_at: "__NOW__"
     note: 문서, 구현과 배포를 교차 확인
   - path: /content/data/architecture
     level: verified
-    source_ids: [src-readme, src-protocol, src-model]
+    source_ids: [src-readme, src-protocol, src-model, src-schema-v3, src-missions, src-connectors, src-policy]
     verified_at: "__NOW__"
     note: 저장 구조와 구현 대조
   - path: /content/data/ai_workflow
@@ -208,7 +333,7 @@ verification:
     note: 공식 흐름과 프로토콜 구현 대조
   - path: /content/data/document_model
     level: verified
-    source_ids: [src-readme, src-model]
+    source_ids: [src-readme, src-model, src-schema-v3]
     verified_at: "__NOW__"
     note: schema v2와 모델 구현 대조
   - path: /content/data/purpose_specific_wikis
@@ -218,7 +343,7 @@ verification:
     note: 공식 variants 가이드 기반
   - path: /content/data/current_release
     level: corroborated
-    source_ids: [src-release, src-pypi, src-readme]
+    source_ids: [src-release, src-changelog, src-pypi, src-readme]
     verified_at: "__NOW__"
     note: 릴리스 문서와 배포 페이지 대조
   - path: /content/data/limitations
@@ -226,6 +351,36 @@ verification:
     source_ids: [src-readme, src-release]
     verified_at: "__NOW__"
     note: 보안 공지와 릴리스 정책 반영
+  - path: /content/data/mission_ledger
+    level: verified
+    source_ids: [src-missions, src-protocol, src-changelog]
+    verified_at: "__NOW__"
+    note: Mission 원장, compact read와 실행 경계 대조
+  - path: /content/data/temporal_knowledge
+    level: verified
+    source_ids: [src-schema-v3, src-changelog]
+    verified_at: "__NOW__"
+    note: schema v3 객체와 조회 명령 대조
+  - path: /content/data/deep_research
+    level: verified
+    source_ids: [src-deep-research, src-changelog]
+    verified_at: "__NOW__"
+    note: Deep Research 읽기 전용 기본값과 claim ledger 대조
+  - path: /content/data/retrieval_trust
+    level: verified
+    source_ids: [src-calibration, src-readme]
+    verified_at: "__NOW__"
+    note: 검색 피드백과 calibration 안전장치 대조
+  - path: /content/data/connectors_and_plugins
+    level: verified
+    source_ids: [src-connectors, src-policy, src-readme]
+    verified_at: "__NOW__"
+    note: read-only connector와 degraded 동작 대조
+  - path: /content/data/skill_identity
+    level: verified
+    source_ids: [src-skill-identity, src-changelog, src-release]
+    verified_at: "__NOW__"
+    note: 3종 스킬 번들과 identity contract 대조
 history:
   - at: "__NOW__"
     action: created
@@ -236,5 +391,8 @@ extensions:
     subject: __WIKI_COMMAND_NAME__
     engine: ai-wiki
     engine_version: __ENGINE_VERSION__
-    protocol: "1.0"
+    protocol: "__PROTOCOL_VERSION__"
+    compatible_protocol_versions: ["1.1", "1.2", "1.3", "1.4", "1.5"]
+    operating_profile: local-single-user
+    skill_bundle: [ai-wiki, ai-wiki-missions, ai-wiki-deep-research]
     generated_during_init: true

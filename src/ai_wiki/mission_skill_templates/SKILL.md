@@ -1,7 +1,7 @@
 ---
 name: ai-wiki-missions
-version: 1.2.0
-description: Resume and execute approved AI Wiki Missions through revision-pinned plans, task leases, evidence submission, independent review, and handoff.
+version: 1.2.1
+description: Resume and execute approved AI Wiki Missions through revision-pinned plans, task leases, evidence submission, independent review, and handoff. Use when the user asks to plan, start, continue, resume, check, review, or hand off ai-wiki Mission work (미션, 작업 계획, 계획 승인, 실행, 이어서 진행, 재개, 진행 상황, 검토, 인계, 핸드오프). If the Mission belongs to a dedicated wiki such as tax-wiki, labor-wiki, law-wiki, or business-wiki, use that wiki's -missions skill instead.
 user-invocable: true
 argument-hint: "[research|plan|execute|resume|status|review]"
 ---

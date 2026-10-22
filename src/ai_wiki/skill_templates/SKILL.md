@@ -1,7 +1,7 @@
 ---
 name: ai-wiki
-version: 1.2.0
-description: AI-first reusable knowledge encyclopedia. Retrieve evidence-linked context before answering, cite document paths, and autonomously write back reusable knowledge through validated create or patch operations.
+version: 1.2.1
+description: General-purpose AI-first knowledge wiki for technology, concepts, research notes, troubleshooting, comparisons, tutorials, and other reusable general knowledge (조사, 개념, 기술, 일반 지식, 정리, 비교, 오류 해결, 사용법, 위키 검색·기록). Retrieve evidence-linked context before answering, cite document paths, and write back reusable knowledge through validated create or patch operations. If the request matches a dedicated wiki's triggers - for example tax-wiki (세무·세금·부가세·원천징수), labor-wiki (노무·근로계약·임금·해고·4대보험), law-wiki (법률·계약·소송·판례), or business-wiki (고객·상담·업무 기록) - use that dedicated wiki first; use ai-wiki only when no dedicated wiki applies.
 user-invocable: true
 argument-hint: "[capabilities|context|get|record-use|record-feedback|patch|create|temporal] [query or options]"
 ---
@@ -10,7 +10,26 @@ argument-hint: "[capabilities|context|get|record-use|record-feedback|patch|creat
 
 AI Wiki is an encyclopedia operated primarily by AI agents. YAML is the durable
 source of truth; agents use the stable CLI JSON protocol to retrieve, cite, and
-write knowledge. Use a dedicated variant when its manifest triggers match.
+write knowledge.
+
+## Routing Priority
+
+ai-wiki is the fallback wiki for general knowledge. When an installed dedicated
+wiki's triggers match the request (tax, labor, law, a business/customer wiki,
+or any other variant), use that wiki's skill and CLI first. Use ai-wiki only
+when no dedicated wiki applies, and never copy private records from a
+dedicated wiki into ai-wiki.
+
+## Reference Files
+
+Read these only at the moment they are needed; they are in this skill folder.
+
+| When | Read |
+| --- | --- |
+| Before writing a new document (`create --document-file`) | `references/templates.md` |
+| Before enriching or fixing an existing document (`patch`) | `references/enrichment.md` |
+| When a command returns `status=error`, or to interpret `meta.retrieval`, citations, or patch rules | `references/protocol.md` |
+| For maintenance: `doctor`, `reindex`, `vindex`, `maintain`, schema migration | `references/operations.md` |
 
 ## Mandatory Workflow
 
@@ -36,7 +55,8 @@ authoritative sources, then patch an existing document or create a new one.
 
 ## Safe Writeback
 
-Read the current version before patching:
+Read the current version before patching (see `references/enrichment.md` for a
+complete patch example):
 
 ```bash
 ai-wiki get <id>
@@ -44,7 +64,8 @@ ai-wiki patch <id> --operations-file patch.json --if-version <version> --dry-run
 ai-wiki patch <id> --operations-file patch.json --if-version <version>
 ```
 
-Create a document from JSON without temporary YAML:
+Create a document from JSON without temporary YAML (read
+`references/templates.md` first for the `content` shape of each type):
 
 ```bash
 ai-wiki create --document-file document.json --dry-run

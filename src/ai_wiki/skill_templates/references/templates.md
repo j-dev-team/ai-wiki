@@ -1,4 +1,29 @@
-# AI Wiki YAML 템플릿
+# AI Wiki 문서 템플릿
+
+새 문서는 `ai-wiki create --document-file document.json`으로 만든다. 아래 YAML 조각은
+JSON 문서의 `content` 객체에 들어갈 **유형별 필드 모양**이다. 최신 필드 목록은
+`ai-wiki template <type>` 또는 `ai-wiki template --list`로 확인한다.
+
+```json
+{
+  "title": "pytest fixture",
+  "category": "technology/python",
+  "tags": ["python", "testing"],
+  "sources": ["https://docs.pytest.org/en/stable/how-to/fixtures.html"],
+  "content": {
+    "type": "technology",
+    "what": "테스트에 필요한 준비·정리 작업을 재사용 가능한 함수로 제공하는 pytest 기능",
+    "facts": ["fixture는 테스트 함수의 인자 이름으로 주입된다"]
+  }
+}
+```
+
+```bash
+ai-wiki create --document-file document.json --dry-run   # 품질·중복 검사
+ai-wiki create --document-file document.json
+```
+
+`duplicate_conflict`가 나오면 새로 만들지 말고 후보 문서를 `references/enrichment.md` 절차로 보강한다.
 
 ## 기술 문서
 

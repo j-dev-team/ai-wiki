@@ -6,7 +6,10 @@ import yaml
 from click.testing import CliRunner
 
 from ai_wiki import __version__
+from ai_wiki.agent_protocol import PROTOCOL_VERSION
 from ai_wiki.cli import _create_seed_document, cli
+from ai_wiki.models import Article
+from ai_wiki.quality import validate
 
 
 def _run(runner, args, wiki_root):
@@ -81,13 +84,33 @@ def test_seed_document_is_detailed_schema_v2(tmp_path):
         assert title_marker in document["title"]
         assert "__WIKI_" not in seed_text
         assert "__ENGINE_VERSION__" not in seed_text
+        assert "__PROTOCOL_VERSION__" not in seed_text
         assert "__NOW__" not in seed_text
         assert document["content"]["type"] == "technology"
-        assert len(document["content"]["data"]) >= 18
-        assert len(document["sources"]) >= 5
-        assert len(document["verification"]) >= 6
+        assert len(document["content"]["data"]) >= 24
+        assert len(document["sources"]) >= 14
+        assert len(document["verification"]) >= 14
         assert document["metadata"]["document_version"] == 1
         assert document["extensions"]["self_reference"]["engine_version"] == __version__
+        assert document["extensions"]["self_reference"]["protocol"] == PROTOCOL_VERSION
+        assert document["content"]["data"]["current_release"]["protocol_version"] == PROTOCOL_VERSION
+        assert document["content"]["data"]["current_release"]["operating_profile"] == "local-single-user"
+        assert document["content"]["data"]["purpose_specific_wikis"]["presets"] == [
+            "general", "law", "labor", "tax", "business", "corporate", "research", "personal", "tech",
+        ]
+        assert document["content"]["data"]["skill_identity"]["bundle"] == [
+            "ai-wiki", "ai-wiki-missions", "ai-wiki-deep-research",
+        ]
+        assert "mission_ledger" in document["content"]["data"]
+        assert "deep_research" in document["content"]["data"]
+        assert "temporal_knowledge" in document["content"]["data"]
+        assert "retrieval_trust" in document["content"]["data"]
+        assert "connectors_and_plugins" in document["content"]["data"]
+
+        report = validate(Article.from_yaml(document))
+        assert report.passed is True
+        assert len(report.errors) == 0
+        assert len(report.warnings) == 0
 
         assert _create_seed_document(wiki_root, lang) is False
 

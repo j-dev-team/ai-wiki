@@ -41,11 +41,131 @@ class VectorSearchUnavailable(RuntimeError):
         self.code = code
 
 
+def _hf_hub_cache_dirs() -> list[Path]:
+    """The cache directory SentenceTransformer will read, resolved without importing the hub.
+
+    Mirrors the library precedence: SENTENCE_TRANSFORMERS_HOME replaces the hub
+    cache, then HF_HUB_CACHE, HUGGINGFACE_HUB_CACHE, and finally HF_HOME/hub.
+    Only that one directory is consulted, so a model cached elsewhere never
+    triggers offline mode for a load that would actually need the network.
+    """
+    for env_name in ("SENTENCE_TRANSFORMERS_HOME", "HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE"):
+        value = os.environ.get(env_name)
+        if value:
+            return [Path(value).expanduser()]
+    hf_home = os.environ.get("HF_HOME")
+    base = Path(hf_home).expanduser() if hf_home else (
+        Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")).expanduser() / "huggingface"
+    )
+    return [base / "hub"]
+
+
+def _model_is_cached(model_name: str = _MODEL_NAME) -> bool:
+    """True when the embedding model can be loaded without any network request."""
+    local = Path(model_name).expanduser()
+    if local.is_dir() and ((local / "modules.json").is_file() or (local / "config.json").is_file()):
+        return True
+    if "/" not in model_name:
+        model_name = f"sentence-transformers/{model_name}"
+    repo_dir = "models--" + model_name.replace("/", "--")
+    for cache in _hf_hub_cache_dirs():
+        snapshots = cache / repo_dir / "snapshots"
+        if not snapshots.is_dir():
+            continue
+        for snapshot in snapshots.iterdir():
+            has_config = (snapshot / "modules.json").is_file() or (snapshot / "config.json").is_file()
+            has_weights = any(snapshot.glob("*.safetensors")) or any(snapshot.glob("*.bin"))
+            if has_config and has_weights:
+                return True
+    return False
+
+
+def _model_logs_verbose() -> bool:
+    return os.environ.get("AI_WIKI_MODEL_VERBOSE", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _set_hub_offline(enabled: bool) -> None:
+    """Toggle HF offline mode both for future imports and already-imported modules."""
+    if enabled:
+        os.environ["HF_HUB_OFFLINE"] = "1"
+    else:
+        os.environ.pop("HF_HUB_OFFLINE", None)
+    import sys
+    constants = sys.modules.get("huggingface_hub.constants")
+    if constants is not None and hasattr(constants, "HF_HUB_OFFLINE"):
+        constants.HF_HUB_OFFLINE = enabled
+
+
+def _quiet_model_environment() -> None:
+    """Silence hub/transformers chatter that would otherwise mix with CLI JSON."""
+    if _model_logs_verbose():
+        return
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+    os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")
+    os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
+    os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
+    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+    import logging
+    for name in ("sentence_transformers", "transformers", "huggingface_hub", "torch"):
+        logging.getLogger(name).setLevel(logging.ERROR)
+
+
+def _silence_loaded_libraries() -> None:
+    if _model_logs_verbose():
+        return
+    try:
+        from huggingface_hub.utils import disable_progress_bars
+        disable_progress_bars()
+    except Exception:
+        pass
+    try:
+        from transformers.utils import logging as transformers_logging
+        transformers_logging.set_verbosity_error()
+        transformers_logging.disable_progress_bar()
+    except Exception:
+        pass
+
+
+def _load_model():
+    """Load SentenceTransformer with stdout kept clean for JSON output.
+
+    Library output (warnings, progress bars, stray prints) goes to stderr or
+    is suppressed. When the model is already cached and the user did not set
+    HF_HUB_OFFLINE explicitly, loading runs offline so no hub request (and no
+    unauthenticated-request warning) is made. If offline loading fails, it is
+    retried once online.
+    """
+    import contextlib
+    import sys
+    import warnings
+
+    _quiet_model_environment()
+    auto_offline = "HF_HUB_OFFLINE" not in os.environ and _model_is_cached()
+    if auto_offline:
+        _set_hub_offline(True)
+
+    def _construct():
+        with contextlib.redirect_stdout(sys.stderr), warnings.catch_warnings():
+            if not _model_logs_verbose():
+                warnings.simplefilter("ignore")
+            from sentence_transformers import SentenceTransformer
+            _silence_loaded_libraries()
+            return SentenceTransformer(_MODEL_NAME)
+
+    try:
+        return _construct()
+    except Exception:
+        if not auto_offline:
+            raise
+        _set_hub_offline(False)
+        return _construct()
+
+
 def _get_model():
     global _model
     if _model is None:
-        from sentence_transformers import SentenceTransformer
-        _model = SentenceTransformer(_MODEL_NAME)
+        _model = _load_model()
     return _model
 
 
@@ -59,12 +179,17 @@ def _encode_texts(texts: list[str], *, query: bool = False) -> list[list[float]]
     if "e5" in _MODEL_NAME.casefold():
         prefix = "query: " if query else "passage: "
         texts = [prefix + text for text in texts]
-    encoded = _get_model().encode(
-        texts,
-        batch_size=_BATCH_SIZE,
-        normalize_embeddings=True,
-        show_progress_bar=False,
-    )
+    import contextlib
+    import sys
+
+    model = _get_model()
+    with contextlib.redirect_stdout(sys.stderr):
+        encoded = model.encode(
+            texts,
+            batch_size=_BATCH_SIZE,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+        )
     vectors = encoded.tolist() if hasattr(encoded, "tolist") else encoded
     if vectors and isinstance(vectors[0], (int, float)):
         vectors = [vectors]

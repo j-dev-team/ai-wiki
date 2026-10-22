@@ -416,7 +416,7 @@ def _find_installed_command(command_name: str, python_executable: str | None = N
 def _write_variant_module(target_dir: Path, spec: VariantSpec) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
     runtime_spec = repr(spec.as_dict())
-    (target_dir / "__init__.py").write_text('__version__ = "1.2.0"\n', encoding="utf-8")
+    (target_dir / "__init__.py").write_text('__version__ = "1.2.1"\n', encoding="utf-8")
     (target_dir / "cli.py").write_text(
         "from pathlib import Path\n\n"
         "from ai_wiki.runtime import activate_variant\n\n"
@@ -464,7 +464,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "{spec.package_name}"
-version = "1.2.0"
+version = "1.2.1"
 description = "{_toml_string(spec.description)}"
 readme = "README.md"
 license = "MIT"
@@ -486,7 +486,7 @@ where = ["src"]
 include = ["{spec.module_name}*"]
 
 [tool.setuptools.package-data]
-{spec.module_name} = ["skill_templates/*.md", "skill_templates/references/*.md", "mission_skill_templates/*.md", "mission_skill_templates/references/*.md", "deep_research_skill_templates/*.md", "variant.yaml"]
+{spec.module_name} = ["skill_templates/*.md", "skill_templates/references/*.md", "mission_skill_templates/*.md", "mission_skill_templates/references/*.md", "deep_research_skill_templates/*.md", "deep_research_skill_templates/references/*.md", "variant.yaml"]
 """
     path.write_text(text, encoding="utf-8")
 
@@ -560,7 +560,7 @@ def _render_skill(spec: VariantSpec) -> str:
     )
     return f"""---
 name: {spec.skill_name}
-version: 1.2.0
+version: 1.2.1
 description: {spec.description} Use this skill whenever the request is about {trigger_text} knowledge, research, records, or retrieval in this dedicated domain. {routing_text}
 user-invocable: true
 argument-hint: "[capabilities|context|get|record-use|patch|create] [query or options]"
@@ -705,7 +705,7 @@ def _render_mission_skill(spec: VariantSpec) -> str:
     command = spec.command_name
     return f"""---
 name: {spec.skill_name}-missions
-version: 1.2.0
+version: 1.2.1
 description: Execute approved {spec.display_name} Missions only through the {command} CLI and its isolated wiki root.
 user-invocable: true
 argument-hint: "[research|plan|execute|resume|status|review]"
@@ -772,7 +772,7 @@ WorkRun은 승인된 정확한 plan revision을 고정하고, evidence에는 파
 def _render_deep_research_skill(spec: VariantSpec) -> str:
     return f"""---
 name: {spec.skill_name}-deep-research
-version: 1.2.0
+version: 1.2.1
 description: Run evidence-led deep research for {spec.display_name}; use only {spec.command_name} and {spec.env_prefix}_ROOT.
 user-invocable: true
 argument-hint: "[read-only|report] <research question>"

@@ -6,14 +6,25 @@ tags:
   - __WIKI_COMMAND_NAME__
   - self-reference
   - AI-first
+  - multi-agent
   - knowledge-base
-  - knowledge-graph
+  - knowledge-ledger
+  - execution-ledger
   - YAML
   - JSON-protocol
   - hybrid-search
+  - chunk-retrieval
   - vector-search
   - citation
   - RFC-6902
+  - optimistic-concurrency
+  - temporal-knowledge
+  - missions
+  - deep-research
+  - claim-ledger
+  - retrieval-calibration
+  - read-only-connectors
+  - skill-routing
   - local-first
 metadata:
   confidence: 0.97
@@ -37,6 +48,30 @@ sources:
     url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/models.py
     title: AI Wiki schema v2 document model
     retrieved_at: "__NOW__"
+  - id: src-schema-v3
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/schema_v3.py
+    title: AI Wiki schema v3 temporal extension
+    retrieved_at: "__NOW__"
+  - id: src-missions
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/docs/MISSIONS.md
+    title: AI Wiki Missions guide
+    retrieved_at: "__NOW__"
+  - id: src-deep-research
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/deep_research_skill_templates/SKILL.md
+    title: AI Wiki Deep Research skill protocol
+    retrieved_at: "__NOW__"
+  - id: src-calibration
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/calibration.py
+    title: AI Wiki retrieval calibration implementation
+    retrieved_at: "__NOW__"
+  - id: src-connectors
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/connectors.py
+    title: AI Wiki read-only connector implementation
+    retrieved_at: "__NOW__"
+  - id: src-policy
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/src/ai_wiki/policy.py
+    title: AI Wiki local policy and namespace rules
+    retrieved_at: "__NOW__"
   - id: src-variants
     url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/docs/VARIANTS.md
     title: Purpose-specific wiki guide
@@ -44,6 +79,14 @@ sources:
   - id: src-release
     url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/docs/RELEASE.ko.md
     title: AI Wiki release workflow
+    retrieved_at: "__NOW__"
+  - id: src-skill-identity
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/docs/SKILL_IDENTITY_CONTRACT.ko.md
+    title: AI Wiki skill identity and alias contract
+    retrieved_at: "__NOW__"
+  - id: src-changelog
+    url: https://github.com/j-dev-team/ai-wiki/blob/v__ENGINE_VERSION__/CHANGELOG.md
+    title: AI Wiki changelog
     retrieved_at: "__NOW__"
   - id: src-pypi
     url: https://pypi.org/project/ai-wiki/__ENGINE_VERSION__/
@@ -54,67 +97,92 @@ content:
   type: technology
   data:
     what: >-
-      __WIKI_DISPLAY_NAME__ is a local-first structured encyclopedia designed for AI agents
-      to retrieve reusable knowledge across sessions, read it with evidence, and apply validated
-      partial updates or create new documents. Its standard command is __WIKI_COMMAND_NAME__.
+      __WIKI_DISPLAY_NAME__ is a structured knowledge and execution ledger that lets external AI
+      agents such as Codex, Claude, and Gemini share one local source of truth across sessions and
+      projects, retrieve evidence, update it safely, and hand off long-running work. Its standard
+      command is __WIKI_COMMAND_NAME__.
     summary: >-
-      It combines YAML source documents, FTS5, vector and relation retrieval, evidence citations,
-      safe partial writes, and isolated purpose-specific wikis. External agents reason over the
-      evidence while the web UI supports human review.
+      YAML documents are durable sources of truth. Deterministic JSON Pointer chunks, exact
+      citations, and optimistic patching make multi-agent reuse safe. Temporal knowledge preserves
+      validity and conflict; Missions records plans, tasks, evidence, review, and handoff; Deep
+      Research links evidence through a claim ledger. The supported operating boundary is a local,
+      single-user environment that is not exposed to external networks.
     facts:
-      - "The shared engine is PyPI ai-wiki __ENGINE_VERSION__ and the AI protocol version is 1.0."
+      - "The shared engine is PyPI ai-wiki __ENGINE_VERSION__ and the AI protocol version is __PROTOCOL_VERSION__."
       - "Primary AI responses contain protocol_version, status, data, meta, and error."
       - "YAML documents are durable sources of truth; wiki.db and vectors.db are derived indexes."
       - "Default retrieval fuses document FTS5, trigram chunk FTS, multilingual E5, and sqlite-vec chunk ranks with RRF."
-      - "context combines search and relation candidates within a default 4,000 estimated-token budget."
+      - "context uses a default 4,000 estimated-token budget and document limit of 8 across default, knowledge, missions, and all scopes."
       - "Citations use doc:<document-id>#<JSON Pointer> to identify a precise evidence path."
-      - "patch supports a safe RFC 6902 subset and requires optimistic if-version checks."
-      - "Legacy v1 documents normalize to v2 on reads and persist as v2 only after modification."
+      - "record-use and independent record-feedback preserve actual use and accepted, rejected, or corrected judgments for retrieval calibration."
+      - "patch supports a safe RFC 6902 subset, dry runs, and optimistic if-version checks."
+      - "Existing v1 and v2 documents do not change on reads; only documents receiving temporal writes evolve to schema v3."
+      - "Schema v3 uses entities, evidence, events, claims, and transitions to preserve validity, corrections, and conflict lineage."
+      - "Missions is not an execution runtime; it records approved plan revisions, task leases, evidence, independent review, and handoff."
+      - "Mission summary, next, task context, and evidence reads provide the minimum complete context for the next action."
+      - "Deep Research defines scope and a claim ledger first and remains read-only unless durable writeback is explicitly requested."
+      - "The base AI Wiki, Missions, and Deep Research skills are installed, upgraded, and audited as one versioned bundle."
       - "Purpose-specific wikis share the engine while isolating documents, databases, vectors, commands, and skills."
-      - "The web UI has no authentication or authorization and is intended only for local use."
+      - "Connectors form a read-only ingestion boundary that preserves source snapshots, provenance, and permissions."
+      - "Retrieval calibration uses independent holdouts, improvement thresholds, cooldown, promotion, and rollback."
+      - "The supported profile is trusted-local single-user operation, not account-based or public network deployment."
     mission:
-      primary: Give AI agents an encyclopedia they can retrieve, cite, enrich, and reuse safely.
-      secondary: Let humans review documents, sources, verification state, changes, and usage records.
-      non_goal: AI Wiki does not contain the model that performs final reasoning or answer generation.
+      primary: Let multiple external AI agents retrieve, update, and reuse one evidence-linked source of truth and hand off long-running work safely.
+      secondary: Let humans audit documents, sources, temporal claims, usage feedback, Mission evidence, and review decisions.
+      non_goal: AI Wiki is not the final reasoning model, autonomous execution runtime, public collaboration service, or secret store.
     design_principles:
       - "AI-first: the primary interface is a deterministic CLI JSON protocol, not the web page."
       - "Evidence-linked: knowledge is traceable through document IDs, JSON Pointers, sources, and verification levels."
+      - "Shared but controlled: revisions, leases, approvals, and independent review control multi-agent conflicts."
       - "Local-first: knowledge remains in the user's local filesystem."
       - "Structured source of truth: YAML originals and derived search indexes have separate responsibilities."
       - "Safe autonomy: AI writes must pass schema, version, protected-field, and quality checks."
       - "Root isolation: wikis with different purposes cannot share documents, indexes, or use records."
       - "Incremental evolution: documents move to new schemas when modified rather than through forced bulk rewrites."
+      - "Temporal fidelity: preserve valid time, recorded time, conflicts, and correction lineage instead of overwriting history."
+      - "Progressive disclosure: return minimum complete context for an answer or next task and expand the full ledger only for audits."
     architecture:
-      durable_storage: schema v2 YAML under articles/<category>/<subcategory>/<slug>.yaml
-      metadata_index: SQLite metadata and FTS5 full-text search in data/wiki.db
-      vector_index: JSON-path chunk embeddings and vector metadata in data/vectors.db
+      durable_knowledge: schema v2 YAML plus optional schema v3 temporal extensions under articles/<category>/<subcategory>/<slug>.yaml
+      mission_ledger: ResearchReport, WorkPlan, WorkRun, and KnowledgeCandidate YAML under missions
+      metadata_index: metadata, relations, use and feedback records, document FTS, and trigram chunk FTS in data/wiki.db
+      vector_index: sqlite-vec chunk embeddings plus model, dimensions, and revision metadata in data/vectors.db
       source_archive: ingested originals under sources
       operation_history: operation logs and Git auto-commits
-      agent_interface: "__WIKI_COMMAND_NAME__ CLI with protocol 1.0 JSON envelopes"
-      human_interface: local Flask document, list, graph, and review screens
-      shared_engine: the PyPI ai-wiki engine plus thin isolated purpose-specific packages
+      agent_interface: "__WIKI_COMMAND_NAME__ CLI with protocol __PROTOCOL_VERSION__ JSON envelopes"
+      human_interface: local Flask document, graph, temporal, review, and Mission command-center screens
+      policy_layer: trusted-local principal, role, namespace, secret reference, redaction, and audit boundaries
+      extension_layer: read-only connectors and optional plugin backends
+      shared_engine: the PyPI ai-wiki engine, three-skill bundle, and isolated purpose-specific packages
     ai_workflow:
       - Discover commands, schema, and limits with capabilities.
       - Retrieve an evidence-linked package with context within a token budget.
       - Answer from documents and citations while preserving citation keys.
       - Record answered or insufficient and the citations actually used with record-use.
+      - Record independent accepted, rejected, or corrected judgments and evidence with record-feedback.
       - Research authoritative external sources when the context is insufficient.
+      - For deep research, define scope, cutoff time, source classes, stop conditions, and a claim ledger first.
       - Enrich existing knowledge through get, dry-run patch, and if-version patch.
       - Create missing knowledge after a dry run and resolve duplicate_conflict explicitly.
+      - For long work, approve a ResearchReport and WorkPlan before recording WorkRun leases, evidence, independent review, and handoff.
       - Run context again to verify retrieval and citation paths after writing.
     protocol_contract:
+      current: "protocol __PROTOCOL_VERSION__, compatible with 1.1 through 1.5"
       success: status is ok, data contains the result, and error is null.
       failure: status is error, data is null, and error describes code, message, retryable, and details.
       read_views: get provides compact, full, and raw views; compact is the default.
       field_projection: get --fields limits output to required fields.
+      context_defaults: max_tokens 4000 and limit 8 across default, knowledge, missions, and all scopes.
+      namespaces: knowledge, plans, runs, artifacts, and external_evidence.
       token_estimation: estimates are conservative and provider-neutral using serialized UTF-8 JSON bytes.
     retrieval_pipeline:
-      candidate_generation: hybrid retrieval selects up to 20 candidates.
-      fusion: Reciprocal Rank Fusion merges FTS5 keyword and vector semantic ranks.
+      candidate_generation: document FTS, trigram chunk FTS, and E5 chunk vectors generate candidates.
+      fusion: Reciprocal Rank Fusion merges keyword and semantic ranks.
+      chunk_identity: deterministic chunk IDs and JSON Pointers support incremental indexing and exact citations.
       relation_expansion: related documents supplement direct search candidates.
       filtering: pending unverified drafts are excluded from default context retrieval.
       compaction: title, summary, facts, limitations, confidence, version, sources, and citations take priority.
       budgeting: low-priority whole documents are omitted instead of truncating values.
+      trust_loop: record-use and independent record-feedback drive holdout calibration; only improved candidates are promoted.
     document_model:
       identity: id, title, category, and tags provide identity and classification.
       metadata: confidence, document_version, timestamps, author, maturity, and completeness.
@@ -122,6 +190,7 @@ content:
       relations: target ID, relation type, direction, weight, and evidence source IDs.
       content: a registered content type separated from structured data.
       verification: JSON Pointer claim paths, verification levels, sources, and timestamps.
+      temporal_extension: schema v3 connects evidence, events, claims, and transitions around canonical entities.
       history: changes remain separate from user knowledge content.
       extensions: purpose-specific data without weakening the core schema.
     write_safety:
@@ -130,62 +199,119 @@ content:
       - Reject failed tests, invalid paths, protected fields, and unsupported operations.
       - Synchronize YAML, SQLite, and vectors through atomic replacement and recovery markers.
       - Validate source references, relation targets, dates, and field types.
+      - Validate temporal entity and event references plus Mission plan revisions, leases, dependencies, and resource locks.
       - Keep deletion outside autonomous AI behavior and require explicit confirmation.
     verification_policy:
       levels: [unverified, sourced, verified, corroborated, disputed, human_verified]
       source_free_rule: source-free reusable knowledge is limited to a pending draft with confidence at or below 0.5.
       normal_retrieval: pending drafts are excluded from default context retrieval.
       citation_integrity: record-use rejects citations not issued by the current context.
+      temporal_conflict: preserve conflicting claims as disputed or linked transitions instead of deleting them.
+      mission_evidence: reject completion without evidence for each acceptance criterion and independent review.
+      calibration_evidence: do not promote retrieval settings from clicks or an agent's self-evaluation.
       quality_dimensions: structure, content, sources, tags, relations, confidence, and verification coverage.
+    mission_ledger:
+      purpose: Preserve evidence-backed work state that another session or agent can safely resume.
+      flow: [ResearchReport, WorkPlan, approval, WorkRun, task lease, evidence, independent review, KnowledgeCandidate]
+      compact_reads: [run summary, run next, task context, run evidence]
+      full_audit: Use run status --full only when the complete ledger is needed for audit.
+      boundary: Codex, Gemini, or another external agent performs reasoning, coding, and tool execution.
+    temporal_knowledge:
+      model: entity-first event-sourced knowledge extension
+      time_axes: [valid_time, recorded_at, event_time]
+      objects: [entities, evidence, events, claims, transitions]
+      views: [current, as-of, known-as-of, timeline, why-changed, disputed]
+      rule: Record correction, replacement, and contradiction lineage instead of overwriting prior claims.
+    deep_research:
+      purpose: Produce reproducible evidence-led research before implementation or decisions.
+      planning: [research question and scope, exclusions, cutoff time, preferred source classes, stop conditions]
+      claim_ledger_states: [supported, contested, insufficient, out_of_scope]
+      method: Read local evidence first, supplement it with primary external sources, and compare conflicting and unresolved evidence.
+      write_boundary: Read-only by default; persist a ResearchReport or knowledge document only after explicit authorization.
+    retrieval_trust:
+      signals: record-use captures use while record-feedback captures independent correctness judgments.
+      calibration: Promote a candidate configuration only with sufficient holdout evidence and improvement over baseline.
+      safeguards: [minimum sample, independent evaluation, cooldown, promotion history, rollback]
+    connectors_and_plugins:
+      connectors: Snapshot external material read-only and preserve provenance and permissions under sources.
+      secrets: Reference tokens as env:<VARIABLE_NAME> instead of storing secret values.
+      plugins: Discover optional backends and report explicit degraded state and cause on failure.
+    skill_identity:
+      bundle: [ai-wiki, ai-wiki-missions, ai-wiki-deep-research]
+      identity_fields: [skill_name, aliases, command_name, env_prefix]
+      upgrade: upgrade-skill updates all three skills to the same release version.
+      audit: variant audit-skills checks names, routing, and resource hashes.
     purpose_specific_wikis:
       reason: separate knowledge with different purposes and security boundaries.
-      presets: [general, law, labor, tax, business, research, personal]
-      custom_manifest: define name, domain, command, description, and triggers for a new category of wiki.
-      isolation: each package has independent YAML, SQLite, vectors, web port, and skills.
+      presets: [general, law, labor, tax, business, corporate, research, personal, tech]
+      custom_manifest: define skill_name, aliases, command_name, env_prefix, domain, and triggers for a new wiki.
+      isolation: each package has independent YAML, SQLite, vectors, web port, and a three-skill bundle.
       lifecycle: install, backup, restore, upgrade, migrate, isolation audit, and skill-routing audit.
     agent_integrations:
-      codex: uses a user SKILL.md to run the JSON protocol.
-      gemini: uses the same protocol through an Antigravity CLI skill.
+      codex: uses SKILL.md to run knowledge, Mission, and Deep Research workflows.
+      gemini: uses the same protocol and skill bundle through Antigravity CLI.
       claude: supports the Claude Code skill format.
-      shared_rule: every agent follows capabilities, context, citation, record-use, and patch or create.
+      shared_rule: every agent follows capabilities, context, citation, record-use, and safe writeback.
+      execution_boundary: agents perform reasoning and tool execution while AI Wiki supplies context and ledgers.
     human_role:
       - Read and review knowledge created by AI agents.
       - Inspect pending documents, sources, confidence, and maturity.
       - Audit relation graphs, change history, and actual use records.
+      - Review temporal claims, retrieval feedback, Mission evidence, and independent decisions.
       - Explicitly authorize high-risk decisions and deletion.
       - Treat the web UI as a review surface rather than a replacement for the AI protocol.
     current_release:
       engine_version: __ENGINE_VERSION__
-      protocol_version: "1.1"
+      protocol_version: "__PROTOCOL_VERSION__"
+      compatible_protocol_versions: ["1.1", "1.2", "1.3", "1.4", "1.5"]
       distribution: [GitHub, PyPI]
-      install_command: pip install ai-wiki
+      install_command: "pip install ai-wiki==__ENGINE_VERSION__"
       wiki_command: __WIKI_COMMAND_NAME__
+      operating_profile: local-single-user
+      skill_bundle: [ai-wiki, ai-wiki-missions, ai-wiki-deep-research]
+      headline_changes: [Mission compact reads, responsive Korean and English Mission views, Deep Research, joint three-skill versioning and audit]
       local_vector_requirement: article and vector-document counts must match, with both chunk indexes ready.
     use_cases:
       - Reuse researched knowledge and troubleshooting across sessions.
       - Accumulate research that needs sources and claim-level verification.
       - Share one local evidence store across multiple AI agents.
+      - Query current, historical, and corrected states of facts that change over time.
+      - Resume approved long-running plans with evidence and handoff context.
       - Isolate operational domains and sensitive data in purpose-specific wikis.
     limitations:
-      - Do not expose it to external networks because it has no authentication or authorization.
+      - The supported operating boundary is local single-user use, not a public multi-user service.
+      - Do not expose the web server or wiki root to external networks.
       - Local documents and databases are not encrypted by default.
-      - Answer accuracy also depends on agent reasoning and source quality.
+      - Answer and execution accuracy also depends on external agents and source quality.
+      - Missions is an execution ledger, not a scheduler or durable workflow runtime.
+      - Deep Research does not automatically guarantee source reliability.
       - Initial vector model setup can require a download and additional disk space.
+      - Calibration may remain uncalibrated until enough independent evaluation is available.
       - Stale knowledge requires re-verification.
     best_practices:
       - Run context before answering and use only citations it returns.
       - Separate stable core knowledge from rapidly changing time-series information.
+      - Author temporal knowledge entity-first, linking events, evidence, claims, and transitions.
       - Link sources to claim paths through verification source_ids.
       - Modify with get, dry-run patch, and if-version patch.
       - Use doctor to confirm matching document and vector counts and vector.ready.
+      - Use run next and task context to confirm Mission revision, lease, and handoff before submitting criterion-level evidence.
+      - Define scope and a claim ledger before Deep Research; persist results only after explicit authorization.
     when_to_use:
       - Knowledge will be reused across sessions or projects.
       - AI must track evidence and versions while applying partial updates.
+      - Approved plans, acceptance criteria, evidence, review, and handoff must survive across sessions.
       - A locally controlled AI encyclopedia with semantic search is required.
     when_not_to_use:
       - As the direct backend for a public multi-user service requiring auth and encryption.
+      - When a durable workflow engine must execute and retry the work itself.
       - For disposable conversation content with no reuse value.
       - For high-risk automated decisions published as facts without source verification.
+    identity_handling:
+      reason: The <document-id> and <VARIABLE_NAME> forms in examples are input placeholders, not anonymized people.
+      scope: Command and format examples in this seed document.
+      source_disclosure_status: not_applicable_no_personal_identity
+      preserved_attributes: [argument role, input format, execution order]
 verification:
   - path: /content/data/what
     level: verified
@@ -194,12 +320,12 @@ verification:
     note: Checked against the official purpose statement.
   - path: /content/data/facts
     level: corroborated
-    source_ids: [src-readme, src-protocol, src-model, src-variants, src-pypi]
+    source_ids: [src-readme, src-protocol, src-model, src-schema-v3, src-missions, src-deep-research, src-calibration, src-connectors, src-policy, src-variants, src-changelog, src-pypi]
     verified_at: "__NOW__"
     note: Cross-checked against documentation, implementation, and distribution.
   - path: /content/data/architecture
     level: verified
-    source_ids: [src-readme, src-protocol, src-model]
+    source_ids: [src-readme, src-protocol, src-model, src-schema-v3, src-missions, src-connectors, src-policy]
     verified_at: "__NOW__"
     note: Checked against repository structure and implementation.
   - path: /content/data/ai_workflow
@@ -209,7 +335,7 @@ verification:
     note: Checked against the protocol implementation.
   - path: /content/data/document_model
     level: verified
-    source_ids: [src-readme, src-model]
+    source_ids: [src-readme, src-model, src-schema-v3]
     verified_at: "__NOW__"
     note: Checked against schema v2 and the document model.
   - path: /content/data/purpose_specific_wikis
@@ -219,7 +345,7 @@ verification:
     note: Based on the official variants guide.
   - path: /content/data/current_release
     level: corroborated
-    source_ids: [src-release, src-pypi, src-readme]
+    source_ids: [src-release, src-changelog, src-pypi, src-readme]
     verified_at: "__NOW__"
     note: Checked against release and distribution documents.
   - path: /content/data/limitations
@@ -227,6 +353,36 @@ verification:
     source_ids: [src-readme, src-release]
     verified_at: "__NOW__"
     note: Reflects the security notice and release policy.
+  - path: /content/data/mission_ledger
+    level: verified
+    source_ids: [src-missions, src-protocol, src-changelog]
+    verified_at: "__NOW__"
+    note: Checked against the Mission ledger, compact reads, and execution boundary.
+  - path: /content/data/temporal_knowledge
+    level: verified
+    source_ids: [src-schema-v3, src-changelog]
+    verified_at: "__NOW__"
+    note: Checked against schema v3 objects and temporal read commands.
+  - path: /content/data/deep_research
+    level: verified
+    source_ids: [src-deep-research, src-changelog]
+    verified_at: "__NOW__"
+    note: Checked against read-only defaults and the claim ledger protocol.
+  - path: /content/data/retrieval_trust
+    level: verified
+    source_ids: [src-calibration, src-readme]
+    verified_at: "__NOW__"
+    note: Checked against retrieval feedback and calibration safeguards.
+  - path: /content/data/connectors_and_plugins
+    level: verified
+    source_ids: [src-connectors, src-policy, src-readme]
+    verified_at: "__NOW__"
+    note: Checked against read-only connectors and degraded behavior.
+  - path: /content/data/skill_identity
+    level: verified
+    source_ids: [src-skill-identity, src-changelog, src-release]
+    verified_at: "__NOW__"
+    note: Checked against the three-skill bundle and identity contract.
 history:
   - at: "__NOW__"
     action: created
@@ -237,5 +393,8 @@ extensions:
     subject: __WIKI_COMMAND_NAME__
     engine: ai-wiki
     engine_version: __ENGINE_VERSION__
-    protocol: "1.0"
+    protocol: "__PROTOCOL_VERSION__"
+    compatible_protocol_versions: ["1.1", "1.2", "1.3", "1.4", "1.5"]
+    operating_profile: local-single-user
+    skill_bundle: [ai-wiki, ai-wiki-missions, ai-wiki-deep-research]
     generated_during_init: true

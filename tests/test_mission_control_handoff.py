@@ -31,7 +31,16 @@ def _render(wiki_root, run, *, lang="en"):
             os.environ["AI_WIKI_ROOT"] = previous
 
 
-def test_typed_handoff_has_stable_order_complete_state_and_resolved_evidence(wiki_root):
+def test_typed_handoff_has_stable_order_complete_state_and_resolved_evidence(wiki_root, monkeypatch):
+    # Freshness is judged against "now"; pin it to the fixture time so the
+    # handoff does not turn stale seven days after the fixture date.
+    from datetime import datetime
+
+    import ai_wiki.missions as missions_module
+    monkeypatch.setattr(
+        missions_module, "utc_now",
+        lambda: datetime.fromisoformat(NOW.replace("Z", "+00:00")),
+    )
     run = run_document()
     html = _render(wiki_root, run)
     headings = (
