@@ -1,6 +1,6 @@
 ---
 name: __SKILL_NAME__-deep-research
-version: 1.2.1
+version: 1.2.2
 description: Run evidence-led deep research for __DISPLAY_NAME__. Use whenever a user asks for a deep investigation, comprehensive research, source comparison, conflicting evidence analysis, current-fact verification, or a ResearchReport before planning or implementation (심층 조사, 깊이 조사, 종합 리서치, 출처 비교, 상충 근거 분석, 최신 사실 확인, 리서치 보고서). Use only __COMMAND_NAME__ and __ROOT_ENV_NAME__; a dedicated wiki's own -deep-research skill takes priority for its domain.
 user-invocable: true
 argument-hint: "[read-only|report] <research question>"

@@ -239,3 +239,26 @@ def test_uncached_model_stays_online_and_explicit_setting_wins(noisy_sentence_tr
     with redirect_stdout(io.StringIO()):
         vector._get_model()
     assert seen["offline"] == "0"
+
+
+@pytest.mark.parametrize("preset", ["law", "labor", "tax", "business", "corporate", "research", "personal", "tech"])
+def test_variant_companion_descriptions_route_and_trigger_in_korean(preset, tmp_path):
+    spec = VariantSpec.from_mapping(load_builtin_preset(preset))
+    package = Path(create_variant_package(spec, output_dir=tmp_path)["package_dir"])
+    module = package / "src" / spec.module_name
+    missions = _frontmatter(module / "mission_skill_templates" / "SKILL.md")
+    research = _frontmatter(module / "deep_research_skill_templates" / "SKILL.md")
+
+    assert missions["name"] == f"{spec.skill_name}-missions"
+    assert research["name"] == f"{spec.skill_name}-deep-research"
+    for description in (missions["description"], research["description"]):
+        assert 300 <= len(description) <= 1024
+        assert spec.command_name in description
+        assert f"{spec.env_prefix}_ROOT" in description
+        assert spec.triggers[0] in description
+    for keyword in ("미션", "재개", "핸드오프"):
+        assert keyword in missions["description"]
+    assert "ai-wiki-missions" in missions["description"]
+    for keyword in ("심층 조사", "출처 비교", "리서치 보고서"):
+        assert keyword in research["description"]
+    assert "ai-wiki-deep-research" in research["description"]

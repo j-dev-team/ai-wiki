@@ -93,7 +93,7 @@ def test_variant_create_generates_independent_package(tmp_path):
     assert "Entity-First Event Authoring" in skill_text
     assert "timeline_contract" in skill_text
     assert "references/domain-checklist.ko.md" in skill_text
-    assert "version: 1.2.1" in skill_text
+    assert "version: 1.2.2" in skill_text
     assert (package_dir / "src" / "law_wiki" / "variant.yaml").exists()
     mission_text = (package_dir / "src" / "law_wiki" / "mission_skill_templates" / "SKILL.md").read_text(encoding="utf-8")
     assert "name: law-wiki-missions" in mission_text
@@ -343,12 +343,12 @@ def test_variant_install_cli_orchestrates_full_provision(tmp_path, monkeypatch):
 def test_skill_upgrade_integrity_reports_version_hash_and_tampering(tmp_path):
     template = tmp_path / "template.md"
     installed = tmp_path / "installed.md"
-    template.write_text("---\nversion: 1.2.1\n---\ncontent", encoding="utf-8")
+    template.write_text("---\nversion: 1.2.2\n---\ncontent", encoding="utf-8")
     installed.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
 
     ok = _skill_file_integrity(template, installed)
     assert ok["matches"] is True
-    assert ok["expected_version"] == "1.2.1"
+    assert ok["expected_version"] == "1.2.2"
 
     installed.write_text("---\nversion: 0.0.1\n---\ntampered", encoding="utf-8")
     failed = _skill_file_integrity(template, installed)

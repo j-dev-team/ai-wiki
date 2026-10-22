@@ -1,6 +1,6 @@
 ---
 name: ai-wiki
-version: 1.2.1
+version: 1.2.2
 description: General-purpose AI-first knowledge wiki for technology, concepts, research notes, troubleshooting, comparisons, tutorials, and other reusable general knowledge (조사, 개념, 기술, 일반 지식, 정리, 비교, 오류 해결, 사용법, 위키 검색·기록). Retrieve evidence-linked context before answering, cite document paths, and write back reusable knowledge through validated create or patch operations. If the request matches a dedicated wiki's triggers - for example tax-wiki (세무·세금·부가세·원천징수), labor-wiki (노무·근로계약·임금·해고·4대보험), law-wiki (법률·계약·소송·판례), or business-wiki (고객·상담·업무 기록) - use that dedicated wiki first; use ai-wiki only when no dedicated wiki applies.
 user-invocable: true
 argument-hint: "[capabilities|context|get|record-use|record-feedback|patch|create|temporal] [query or options]"

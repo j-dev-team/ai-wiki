@@ -4,7 +4,7 @@ AI Wiki는 AI가 지식을 검색하고 읽고 부분 수정하며 재사용하�
 
 [English README](https://github.com/j-dev-team/ai-wiki/blob/master/README.md)
 
-[AI Wiki 1.2.1 통합 사용설명서](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md) | [목적별 독립 위키 안내](https://github.com/j-dev-team/ai-wiki/blob/master/docs/VARIANTS.md)
+[AI Wiki 1.2.2 통합 사용설명서](https://github.com/j-dev-team/ai-wiki/blob/master/docs/USER_GUIDE.ko.md) | [목적별 독립 위키 안내](https://github.com/j-dev-team/ai-wiki/blob/master/docs/VARIANTS.md)
 
 > 로컬 단독 사용 안내: AI Wiki는 한 명이 PC에서 단독으로 쓰는 것을 기준으로 하며, 계정·로그인·서버 설정이 필요 없습니다. 웹 UI와 데이터 디렉터리를 외부 네트워크에 공개하지 말고, 운영체제 계정과 위키 폴더 접근 권한을 보호하세요. 전체 저장소 암호화는 운영체제의 책임입니다.
 

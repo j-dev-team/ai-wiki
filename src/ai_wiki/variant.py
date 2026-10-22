@@ -416,7 +416,7 @@ def _find_installed_command(command_name: str, python_executable: str | None = N
 def _write_variant_module(target_dir: Path, spec: VariantSpec) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
     runtime_spec = repr(spec.as_dict())
-    (target_dir / "__init__.py").write_text('__version__ = "1.2.1"\n', encoding="utf-8")
+    (target_dir / "__init__.py").write_text('__version__ = "1.2.2"\n', encoding="utf-8")
     (target_dir / "cli.py").write_text(
         "from pathlib import Path\n\n"
         "from ai_wiki.runtime import activate_variant\n\n"
@@ -464,7 +464,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "{spec.package_name}"
-version = "1.2.1"
+version = "1.2.2"
 description = "{_toml_string(spec.description)}"
 readme = "README.md"
 license = "MIT"
@@ -560,7 +560,7 @@ def _render_skill(spec: VariantSpec) -> str:
     )
     return f"""---
 name: {spec.skill_name}
-version: 1.2.1
+version: 1.2.2
 description: {spec.description} Use this skill whenever the request is about {trigger_text} knowledge, research, records, or retrieval in this dedicated domain. {routing_text}
 user-invocable: true
 argument-hint: "[capabilities|context|get|record-use|patch|create] [query or options]"
@@ -700,13 +700,27 @@ def _render_domain_checklist(spec: VariantSpec) -> str:
 """
 
 
+def _companion_trigger_text(spec: VariantSpec, limit: int = 8) -> str:
+    """Short domain hint for companion skill descriptions (kept under the 1024-char cap)."""
+    return ", ".join(spec.triggers[:limit]) if spec.triggers else spec.domain
+
+
 def _render_mission_skill(spec: VariantSpec) -> str:
     """Render a Mission skill that cannot silently target the generic CLI."""
     command = spec.command_name
+    description = (
+        f"Resume and execute approved {spec.display_name} Missions through revision-pinned plans, "
+        f"task leases, evidence submission, independent review, and handoff, only through the "
+        f"{command} CLI and {spec.env_prefix}_ROOT. Use when the user asks to plan, start, continue, "
+        f"resume, check, review, or hand off Mission work for {spec.display_name} or its domain "
+        f"({_companion_trigger_text(spec)}) (미션, 작업 계획, 계획 승인, 실행, 이어서 진행, 재개, "
+        f"진행 상황, 검토, 인계, 핸드오프). Use this instead of ai-wiki-missions for this wiki's "
+        f"Missions, and never run another wiki's Missions with it."
+    )
     return f"""---
 name: {spec.skill_name}-missions
-version: 1.2.1
-description: Execute approved {spec.display_name} Missions only through the {command} CLI and its isolated wiki root.
+version: 1.2.2
+description: {description}
 user-invocable: true
 argument-hint: "[research|plan|execute|resume|status|review]"
 ---
@@ -770,10 +784,18 @@ WorkRun은 승인된 정확한 plan revision을 고정하고, evidence에는 파
 
 
 def _render_deep_research_skill(spec: VariantSpec) -> str:
+    description = (
+        f"Run evidence-led deep research for {spec.display_name} using only {spec.command_name} and "
+        f"{spec.env_prefix}_ROOT. Use whenever a user asks for a deep investigation, comprehensive "
+        f"research, source comparison, conflicting evidence analysis, current-fact verification, or "
+        f"a ResearchReport in this domain ({_companion_trigger_text(spec)}) (심층 조사, 깊이 조사, "
+        f"종합 리서치, 출처 비교, 상충 근거 분석, 최신 사실 확인, 리서치 보고서). Takes priority over "
+        f"ai-wiki-deep-research for this domain; never read or write another wiki root."
+    )
     return f"""---
 name: {spec.skill_name}-deep-research
-version: 1.2.1
-description: Run evidence-led deep research for {spec.display_name}; use only {spec.command_name} and {spec.env_prefix}_ROOT.
+version: 1.2.2
+description: {description}
 user-invocable: true
 argument-hint: "[read-only|report] <research question>"
 ---
