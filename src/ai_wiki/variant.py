@@ -319,25 +319,53 @@ def _load_yaml_resource(resource) -> dict[str, Any] | None:
     return yaml.safe_load(resource.read_text(encoding="utf-8")) or {}
 
 
+def _pip_missing(completed: subprocess.CompletedProcess) -> bool:
+    output = f"{completed.stderr or ''}\n{completed.stdout or ''}"
+    return completed.returncode != 0 and "No module named pip" in output
+
+
+def run_package_installer(
+    python_executable: str, pip_args: list[str], *, cwd: str | None = None
+) -> tuple[list[str], subprocess.CompletedProcess]:
+    """Run ``python -m pip <args>``; fall back to ``uv pip`` when that interpreter has no pip.
+
+    Environments created by uv (``uv tool install``, ``uv venv``) ship without pip.
+    The fallback targets the same interpreter through ``--python`` so the package
+    lands in the environment that runs the engine.
+    """
+    kwargs: dict[str, Any] = {"text": True, "capture_output": True, "check": False}
+    if cwd is not None:
+        kwargs["cwd"] = cwd
+    command = [python_executable, "-m", "pip", *pip_args]
+    completed = subprocess.run(command, **kwargs)
+    if not _pip_missing(completed):
+        return command, completed
+    uv = shutil.which("uv")
+    if uv is None:
+        raise RuntimeError(
+            f"pip is not available for {python_executable} and the uv command was not found; "
+            "install pip into that environment or put uv on PATH"
+        )
+    # uv never prompts, so pip's -y confirmation flag is not accepted.
+    uv_args = [arg for arg in pip_args if arg != "-y"]
+    command = [uv, "pip", uv_args[0], "--python", python_executable, *uv_args[1:]]
+    return command, subprocess.run(command, **kwargs)
+
+
 def install_variant_package(package_dir: Path, *, python_executable: str | None = None) -> dict[str, Any]:
     package_dir = package_dir.resolve()
     if not (package_dir / "pyproject.toml").exists():
         raise FileNotFoundError(f"pyproject.toml not found in generated package: {package_dir}")
 
     python_executable = python_executable or sys.executable
-    command = [python_executable, "-m", "pip", "install", "-e", str(package_dir)]
-    completed = subprocess.run(
-        command,
-        cwd=str(package_dir),
-        text=True,
-        capture_output=True,
-        check=False,
+    command, completed = run_package_installer(
+        python_executable, ["install", "-e", str(package_dir)], cwd=str(package_dir)
     )
     if completed.returncode != 0:
         details = (completed.stderr or completed.stdout or "").strip()
         if len(details) > 4000:
             details = details[-4000:]
-        raise RuntimeError(f"pip install -e failed with exit code {completed.returncode}: {details}")
+        raise RuntimeError(f"{' '.join(command[:4])} failed with exit code {completed.returncode}: {details}")
 
     return {
         "installed": True,
@@ -416,7 +444,7 @@ def _find_installed_command(command_name: str, python_executable: str | None = N
 def _write_variant_module(target_dir: Path, spec: VariantSpec) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
     runtime_spec = repr(spec.as_dict())
-    (target_dir / "__init__.py").write_text('__version__ = "1.2.2"\n', encoding="utf-8")
+    (target_dir / "__init__.py").write_text('__version__ = "1.2.3"\n', encoding="utf-8")
     (target_dir / "cli.py").write_text(
         "from pathlib import Path\n\n"
         "from ai_wiki.runtime import activate_variant\n\n"
@@ -464,7 +492,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "{spec.package_name}"
-version = "1.2.2"
+version = "1.2.3"
 description = "{_toml_string(spec.description)}"
 readme = "README.md"
 license = "MIT"
@@ -560,7 +588,7 @@ def _render_skill(spec: VariantSpec) -> str:
     )
     return f"""---
 name: {spec.skill_name}
-version: 1.2.2
+version: 1.2.3
 description: {spec.description} Use this skill whenever the request is about {trigger_text} knowledge, research, records, or retrieval in this dedicated domain. {routing_text}
 user-invocable: true
 argument-hint: "[capabilities|context|get|record-use|patch|create] [query or options]"
@@ -719,7 +747,7 @@ def _render_mission_skill(spec: VariantSpec) -> str:
     )
     return f"""---
 name: {spec.skill_name}-missions
-version: 1.2.2
+version: 1.2.3
 description: {description}
 user-invocable: true
 argument-hint: "[research|plan|execute|resume|status|review]"
@@ -794,7 +822,7 @@ def _render_deep_research_skill(spec: VariantSpec) -> str:
     )
     return f"""---
 name: {spec.skill_name}-deep-research
-version: 1.2.2
+version: 1.2.3
 description: {description}
 user-invocable: true
 argument-hint: "[read-only|report] <research question>"

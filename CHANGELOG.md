@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.3 - 2026-10-22
+
+- Fall back to `uv pip` when the engine's Python environment has no pip (environments created by `uv tool install` or `uv venv`). `variant create --install`, `install`, `upgrade`, `migrate`, and `uninstall` now succeed there; the fallback targets the same interpreter with `--python`. Other pip failures are reported unchanged, and a missing pip with no `uv` on PATH produces an explicit error.
+
 ## 1.2.2 - 2026-10-22
 
 - Expand the generated Missions and Deep Research skill descriptions for purpose-specific wikis: they now say when to use the skill, list up to eight domain triggers, add Korean trigger keywords (미션, 재개, 핸드오프 / 심층 조사, 출처 비교, 리서치 보고서 …), and state that they take priority over the generic `ai-wiki-missions` / `ai-wiki-deep-research` skills for their domain while never touching another wiki root.

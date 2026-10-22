@@ -93,7 +93,7 @@ def test_variant_create_generates_independent_package(tmp_path):
     assert "Entity-First Event Authoring" in skill_text
     assert "timeline_contract" in skill_text
     assert "references/domain-checklist.ko.md" in skill_text
-    assert "version: 1.2.2" in skill_text
+    assert "version: 1.2.3" in skill_text
     assert (package_dir / "src" / "law_wiki" / "variant.yaml").exists()
     mission_text = (package_dir / "src" / "law_wiki" / "mission_skill_templates" / "SKILL.md").read_text(encoding="utf-8")
     assert "name: law-wiki-missions" in mission_text
@@ -343,12 +343,12 @@ def test_variant_install_cli_orchestrates_full_provision(tmp_path, monkeypatch):
 def test_skill_upgrade_integrity_reports_version_hash_and_tampering(tmp_path):
     template = tmp_path / "template.md"
     installed = tmp_path / "installed.md"
-    template.write_text("---\nversion: 1.2.2\n---\ncontent", encoding="utf-8")
+    template.write_text("---\nversion: 1.2.3\n---\ncontent", encoding="utf-8")
     installed.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
 
     ok = _skill_file_integrity(template, installed)
     assert ok["matches"] is True
-    assert ok["expected_version"] == "1.2.2"
+    assert ok["expected_version"] == "1.2.3"
 
     installed.write_text("---\nversion: 0.0.1\n---\ntampered", encoding="utf-8")
     failed = _skill_file_integrity(template, installed)
@@ -369,3 +369,61 @@ def test_windows_process_diagnostic_reports_pid_without_terminating(monkeypatch)
         "image": "ai-wiki.exe", "pid": "4321",
         "next_action": "stop the local server normally, then retry upgrade",
     }]
+
+
+def _fake_installer(monkeypatch, pip_stderr: str, uv_path: str | None = "C:/tools/uv.exe"):
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        if command[1:3] == ["-m", "pip"]:
+            return subprocess.CompletedProcess(command, 1, stdout="", stderr=pip_stderr)
+        return subprocess.CompletedProcess(command, 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr("ai_wiki.variant.subprocess.run", fake_run)
+    monkeypatch.setattr("ai_wiki.variant.shutil.which", lambda name: uv_path if name == "uv" else None)
+    return calls
+
+
+def test_install_variant_package_falls_back_to_uv_without_pip(tmp_path, monkeypatch):
+    package_dir = tmp_path / "law-wiki"
+    package_dir.mkdir()
+    (package_dir / "pyproject.toml").write_text("[project]\nname = \"law-wiki\"\n", encoding="utf-8")
+    calls = _fake_installer(monkeypatch, "C:/uv/python.exe: No module named pip")
+
+    result = install_variant_package(package_dir, python_executable="python-test")
+
+    assert result["installed"] is True
+    assert calls[-1] == ["C:/tools/uv.exe", "pip", "install", "--python", "python-test", "-e", str(package_dir.resolve())]
+    assert result["command"] == calls[-1]
+
+
+def test_uninstall_falls_back_to_uv_without_confirmation_flag(monkeypatch):
+    from ai_wiki.variant import run_package_installer
+
+    calls = _fake_installer(monkeypatch, "No module named pip")
+    command, completed = run_package_installer("python-test", ["uninstall", "-y", "law-wiki"])
+
+    assert completed.returncode == 0
+    assert command == ["C:/tools/uv.exe", "pip", "uninstall", "--python", "python-test", "law-wiki"]
+
+
+def test_missing_pip_and_uv_reports_both(monkeypatch):
+    import pytest
+    from ai_wiki.variant import run_package_installer
+
+    _fake_installer(monkeypatch, "No module named pip", uv_path=None)
+    with pytest.raises(RuntimeError, match="uv command was not found"):
+        run_package_installer("python-test", ["install", "-e", "."])
+
+
+def test_other_pip_failures_do_not_switch_to_uv(tmp_path, monkeypatch):
+    import pytest
+
+    package_dir = tmp_path / "law-wiki"
+    package_dir.mkdir()
+    (package_dir / "pyproject.toml").write_text("[project]\nname = \"law-wiki\"\n", encoding="utf-8")
+    calls = _fake_installer(monkeypatch, "ERROR: resolution failed")
+    with pytest.raises(RuntimeError, match="resolution failed"):
+        install_variant_package(package_dir, python_executable="python-test")
+    assert len(calls) == 1

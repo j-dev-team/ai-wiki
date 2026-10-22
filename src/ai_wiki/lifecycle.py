@@ -13,7 +13,7 @@ from typing import Any
 
 import yaml
 
-from ai_wiki.variant import VariantSpec, _find_installed_command, create_variant_package, install_variant_package
+from ai_wiki.variant import VariantSpec, _find_installed_command, create_variant_package, install_variant_package, run_package_installer
 
 
 _EXCLUDED_DIRS = {".git", ".venv", "__pycache__", ".pytest_cache", "build", "dist"}
@@ -123,8 +123,7 @@ def uninstall_variant(
     spec = load_variant_spec(package_dir)
     backup = backup_variant(package_dir) if create_backup else None
     python_executable = python_executable or sys.executable
-    command = [python_executable, "-m", "pip", "uninstall", "-y", spec.package_name]
-    completed = subprocess.run(command, text=True, capture_output=True, check=False)
+    command, completed = run_package_installer(python_executable, ["uninstall", "-y", spec.package_name])
     if completed.returncode != 0:
         raise RuntimeError((completed.stderr or completed.stdout or "pip uninstall failed").strip())
 
