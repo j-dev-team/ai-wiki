@@ -23,7 +23,31 @@ ai-wiki create --document-file document.json --dry-run   # 품질·중복 검사
 ai-wiki create --document-file document.json
 ```
 
-`duplicate_conflict`가 나오면 새로 만들지 말고 후보 문서를 `references/enrichment.md` 절차로 보강한다.
+## 중복 후보 확인
+
+`--dry-run` 응답의 `data.merge_candidates`에는 제목과 요약이 비슷한 기존 문서가
+들어 있다. 후보마다 `level`(`duplicate`·`review`·`clear`), 유사도, 겹친 근거
+문단(`matched_path`, `matched_text`)이 있다.
+
+1. `duplicate_conflict`가 나오면 새로 만들지 않는다. `error.details.unresolved`의
+   문서를 `ai-wiki get <id>`로 읽고, 같은 주제면 `references/enrichment.md` 절차로
+   그 문서를 보강한다.
+2. 정말 다른 주제일 때만 `unresolved`의 **모든** id에 대해 무엇이 다른지 적어
+   다시 보낸다. 이유는 새 문서에 저장되어 나중에 검토된다.
+
+```json
+{
+  "title": "...",
+  "category": "...",
+  "content": {"type": "..."},
+  "distinct_from": [
+    {"id": "기존-문서-id", "reason": "기존 문서는 배포 절차, 이 문서는 버전 번호 규칙만 다룸"}
+  ]
+}
+```
+
+- 제목만 바꿔서 다시 보내 검사를 피하지 않는다. 판정은 요약 내용으로도 한다.
+- `reason`이 비어 있으면 거부된다. "다른 문서임" 같은 빈 이유를 쓰지 않는다.
 
 ## 기술 문서
 

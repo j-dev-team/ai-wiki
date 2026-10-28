@@ -230,6 +230,7 @@ from ai_wiki.storage import (
 from ai_wiki.utils import generate_id, output_error, output_json
 from ai_wiki.wikilog import append_log, migrate_legacy_log
 from ai_wiki.catalog import rebuild_catalog
+from ai_wiki.dedup import find_merge_candidates, normalize_distinct_from, unacknowledged
 from ai_wiki.policy import PolicyDenied, SecurityPolicy
 
 
@@ -1415,6 +1416,8 @@ def create(ctx, title, category, tags, confidence, source, related, author,
             if not isinstance(payload, dict):
                 raise ProtocolFailure("invalid_document", "Document input must be a JSON object")
             policy.validate_secrets(payload)
+            payload = dict(payload)
+            distinct_from = normalize_distinct_from(payload.pop("distinct_from", None))
             if payload.get("schema_version") == 2:
                 article = Article.from_yaml(payload)
             else:
@@ -1438,12 +1441,24 @@ def create(ctx, title, category, tags, confidence, source, related, author,
                     sources=source_urls, related=payload.get("related", []),
                     author=payload.get("author", "ai-agent"),
                 )
-            similar = idx.find_similar_titles(article.title)
-            if similar:
+            merge_report = find_merge_candidates(article, idx)
+            unresolved = unacknowledged(merge_report, distinct_from)
+            if unresolved:
                 _output_protocol_failure(ProtocolFailure(
-                    "duplicate_conflict", "A similar document already exists",
-                    details={"candidates": similar}, retryable=True,
+                    "duplicate_conflict", "Existing documents may already cover this topic",
+                    details={
+                        **merge_report,
+                        "unresolved": [item["id"] for item in unresolved],
+                        "resolution": (
+                            "Prefer patching the matching document. If the new document is a "
+                            "different topic, resend with distinct_from: [{id, reason}] for "
+                            "every unresolved id."
+                        ),
+                    },
+                    retryable=True,
                 ))
+            if distinct_from:
+                article.metadata["distinct_from"] = distinct_from
             if not article.sources:
                 article.confidence = min(article.confidence, 0.5)
                 article.metadata["verification_status"] = "pending"
@@ -1471,6 +1486,7 @@ def create(ctx, title, category, tags, confidence, source, related, author,
                 "article_id": article.id, "dry_run": dry_run,
                 "verification_status": article.metadata.get("verification_status", "active"),
                 "document": compact, "quality": report.to_dict(),
+                "merge_candidates": merge_report,
             }
             if dry_run:
                 output_json(protocol_success(response))
@@ -1507,17 +1523,6 @@ def create(ctx, title, category, tags, confidence, source, related, author,
     if content is None:
         output_error(msg("content_input_required"), "invalid_input")
 
-    if not force:
-        similar = idx.find_similar_titles(title)
-        if similar:
-            output_json({
-                "status": "duplicate_warning",
-                "message": "A document with a similar title already exists",
-                "similar": similar,
-                "hint": "Use --force flag to override",
-            })
-            sys.exit(1)
-
     article_id = generate_id(title, category)
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
     related_list = [r.strip() for r in related.split(",") if r.strip()] if related else []
@@ -1527,6 +1532,18 @@ def create(ctx, title, category, tags, confidence, source, related, author,
         tags=tag_list, confidence=confidence, sources=list(source),
         related=related_list, author=author,
     )
+
+    if not force:
+        merge_report = find_merge_candidates(article, idx)
+        if merge_report["status"] != "clear":
+            output_json({
+                "status": "duplicate_warning",
+                "message": "Existing documents may already cover this topic",
+                "similar": merge_report["candidates"],
+                "merge_candidates": merge_report,
+                "hint": "Patch the matching document, or use --force if this is a different topic",
+            })
+            sys.exit(1)
 
     # Auto-generate _meta + _changelog
     comp, missing, hints = compute_completeness(content)

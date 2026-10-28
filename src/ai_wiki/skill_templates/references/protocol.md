@@ -23,6 +23,18 @@ degraded successful response.
 Every citation has a document ID, canonical JSON Pointer path, verification
 level, and source IDs. Cite only keys returned by the current context.
 
+## Creation and duplicates
+
+`create --document-file` compares the new title and summary against existing
+documents (character-bigram title similarity and embedding similarity). The
+response always includes `data.merge_candidates` with `status`, per-candidate
+`level` (`duplicate`, `review`, `clear`), scores, matched evidence, and the
+thresholds used. A `review` or `duplicate` candidate makes create fail with
+`duplicate_conflict`; `error.details.unresolved` lists the ids to resolve.
+Resolve by patching a candidate, or by resending with
+`distinct_from: [{"id": ..., "reason": ...}]` for every unresolved id. The
+reasons are stored in `extensions.system_metadata.distinct_from`.
+
 ## Mutation
 
 Patch uses the RFC 6902 subset `test`, `add`, `replace`, and `remove`.

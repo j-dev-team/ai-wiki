@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Detect merge candidates before `create`: the new title and summary are compared with existing documents by character-bigram title similarity (spacing and particle tolerant) and embedding similarity. Thresholds for `intfloat/multilingual-e5-small` were measured on a real Korean wiki (reworded duplicates 0.912-0.948, related but distinct topics 0.853-0.896): `review` at 0.905, `duplicate` at 0.95; titles at 0.5 / 0.8.
+- `create --document-file` always returns `data.merge_candidates` (levels, scores, matched evidence, thresholds). A `review` or `duplicate` candidate fails with `duplicate_conflict` and `error.details.unresolved`; resolve by patching, or by resending with `distinct_from: [{id, reason}]`, which is stored in `extensions.system_metadata.distinct_from`. Legacy `create --title` uses the same check as a warning that `--force` overrides.
+- Document the flow in the ai-wiki and variant skills, `references/templates.md`, `references/protocol.md`, and `schema-json` (`x-ai-wiki-create-request`).
+
 ## 1.2.3 - 2026-10-22
 
 - Fall back to `uv pip` when the engine's Python environment has no pip (environments created by `uv tool install` or `uv venv`). `variant create --install`, `install`, `upgrade`, `migrate`, and `uninstall` now succeed there; the fallback targets the same interpreter with `--python`. Other pip failures are reported unchanged, and a missing pip with no `uv` on PATH produces an explicit error.

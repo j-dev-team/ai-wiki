@@ -74,7 +74,11 @@ ai-wiki create --document-file document.json
 
 - Never retry a `version_conflict` without retrieving the current document.
 - Never delete autonomously. Deletion requires an explicit user request.
-- Prefer patching a matching document; `duplicate_conflict` returns candidates.
+- Before every create, run `--dry-run` and read `data.merge_candidates`. On
+  `duplicate_conflict`, patch the matching candidate instead of creating. Only
+  for a genuinely different topic, resend with `distinct_from: [{id, reason}]`
+  covering every `error.details.unresolved` id. Never reword a title to evade
+  the check (see `references/templates.md`).
 - Source-free reusable knowledge may be saved only as a pending, unverified draft.
 - Do not use legacy full-document update in the normal agent workflow.
 

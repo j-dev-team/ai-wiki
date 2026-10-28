@@ -23,6 +23,7 @@ from ai_wiki.schema_v3 import document_v3_json_schema
 from ai_wiki.storage import atomic_save, atomic_update, load_article_with_path
 from ai_wiki.temporal_contracts import temporal_json_schema
 from ai_wiki.utils import generate_id
+from ai_wiki.dedup import find_merge_candidates, normalize_distinct_from, unacknowledged
 
 
 class AIWikiClient:
@@ -285,6 +286,8 @@ class AIWikiClient:
     def create(self, document: dict[str, Any], *, dry_run: bool = False) -> dict:
         principal = self._authorize("create", "knowledge")
         self.policy.validate_secrets(document)
+        document = dict(document)
+        distinct_from = normalize_distinct_from(document.pop("distinct_from", None))
         article = Article.from_yaml(document) if document.get("schema_version") in {2, 3} else Article(
             id=document.get("id") or generate_id(document["title"], document["category"]),
             title=document["title"], category=document["category"],
@@ -294,9 +297,15 @@ class AIWikiClient:
             sources=[item.get("url") if isinstance(item, dict) else item for item in document.get("sources", [])],
             related=document.get("related", []), author=document.get("author", principal.id),
         )
-        duplicates = self.index.find_similar_titles(article.title)
-        if duplicates:
-            raise ValueError("duplicate_conflict:" + json.dumps(duplicates, ensure_ascii=False))
+        with self._activated():
+            merge_report = find_merge_candidates(article, self.index)
+        unresolved = unacknowledged(merge_report, distinct_from)
+        if unresolved:
+            raise ValueError("duplicate_conflict:" + json.dumps(
+                {**merge_report, "unresolved": [item["id"] for item in unresolved]}, ensure_ascii=False,
+            ))
+        if distinct_from:
+            article.metadata["distinct_from"] = distinct_from
         if not article.sources:
             article.confidence = min(article.confidence, 0.5)
             article.metadata["verification_status"] = "pending"
@@ -312,7 +321,8 @@ class AIWikiClient:
         canonical = article.to_yaml_dict()
         report = quality_validate(article)
         response = {"article_id": article.id, "dry_run": dry_run,
-                    "document": compact_document(article)[0], "quality": report.to_dict()}
+                    "document": compact_document(article)[0], "quality": report.to_dict(),
+                    "merge_candidates": merge_report}
         if not dry_run:
             with self._activated():
                 path = atomic_save(

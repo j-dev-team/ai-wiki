@@ -691,6 +691,10 @@ When writing knowledge:
 - mark uncertainty with lower `confidence`, `limitations`, or verification metadata
 - prefer categories under `{spec.domain}/...`
 - treat `version_conflict` and `duplicate_conflict` as required re-read decisions
+- before every create, run `--dry-run` and read `data.merge_candidates`; on
+  `duplicate_conflict`, patch the matching candidate, or, only for a genuinely
+  different topic, resend with `distinct_from: [{{id, reason}}]` covering every
+  `error.details.unresolved` id; never reword a title to evade the check
 """
 
 

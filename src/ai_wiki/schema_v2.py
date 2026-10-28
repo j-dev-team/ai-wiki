@@ -245,4 +245,21 @@ def document_json_schema() -> dict[str, Any]:
     schema["x-ai-wiki-content-types"] = copy.deepcopy(TYPE_SCHEMAS)
     from ai_wiki.temporal_contracts import temporal_json_schema
     schema["x-ai-wiki-temporal-extension"] = temporal_json_schema()
+    schema["x-ai-wiki-create-request"] = {
+        "description": "Request-only fields accepted by create --document-file; not stored at the top level.",
+        "properties": {
+            "distinct_from": {
+                "type": "array",
+                "description": (
+                    "Acknowledges merge candidates reported by duplicate_conflict as different topics. "
+                    "Stored in extensions.system_metadata.distinct_from."
+                ),
+                "items": {
+                    "type": "object",
+                    "required": ["id", "reason"],
+                    "properties": {"id": {"type": "string"}, "reason": {"type": "string", "minLength": 1}},
+                },
+            },
+        },
+    }
     return schema
