@@ -81,7 +81,7 @@ def test_alias_is_backed_up_migrated_and_audit_compares_template_hash(tmp_path, 
     audit = audit_skill_installation([package_dir])
     assert audit["status"] == "error"
     assert audit["problems"][0]["content_matches"] is False
-    assert audit["problems"][0]["expected_version"] == "1.2.3"
+    assert audit["problems"][0]["expected_version"] == "1.2.4"
     assert audit["problems"][0]["recovery"]
 
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.4 - 2026-10-28
 
 - Detect merge candidates before `create`: the new title and summary are compared with existing documents by character-bigram title similarity (spacing and particle tolerant) and embedding similarity. Thresholds for `intfloat/multilingual-e5-small` were measured on a real Korean wiki (reworded duplicates 0.912-0.948, related but distinct topics 0.853-0.896): `review` at 0.905, `duplicate` at 0.95; titles at 0.5 / 0.8.
 - `create --document-file` always returns `data.merge_candidates` (levels, scores, matched evidence, thresholds). A `review` or `duplicate` candidate fails with `duplicate_conflict` and `error.details.unresolved`; resolve by patching, or by resending with `distinct_from: [{id, reason}]`, which is stored in `extensions.system_metadata.distinct_from`. Legacy `create --title` uses the same check as a warning that `--force` overrides.
